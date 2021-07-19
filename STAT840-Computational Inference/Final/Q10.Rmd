@@ -1,0 +1,30 @@
+---
+title: "STAT840 Final Exam"
+author: "Branden Lee"
+date: "4/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 10
+#### a)
+Note since $w(x)$ is a density,  
+\begin{align} E_{X,Y}\left(\frac{f_{X,Y}(x,Y)w(X)}{f_{X,Y}(X,Y)}\right)&=\iint \frac{f_{X,Y}(x,y)w(u)}{f_{X,Y}(u,y)}f_{X,Y}(u,y)dudy\\ &=\iint f_{X,Y}(x,y)w(u)dudy\\ &=\int f_{X,Y}(x,y)dy\int w(u)du\\&=f_{X}(x)\end{align}  
+Then by the strong law of large numbers, 
+$$\hat f_X(x)=\frac{1}{N}\sum_{i=1}^N\frac{f_{X,Y}(x,Y_i)w(X_i)}{f_{X,Y}(X_i, Y_i)}\xrightarrow{\text{     a.s.     }}f_X(x)$$
+Almost sure convergence implies convergence in probability, as desired.
+The variance of the estimator can be expressed as
+
+$$Var(\hat f_X(x)) = \frac{1}{N}\left(E_{X,Y}\left(\frac{f_{X,Y}(x,Y)w(X)}{f_{X,Y}(X,Y)}\right)^2 - f_{X}(x)^2\right)$$
+
+#### b)
+\begin{align}
+\hat f_X(x) &= \frac{1}{N}\sum_{i=1}^N \frac{f_{X,Y}(x,Y_i)w(X_i)}{f_{X,Y}(X_i, Y_i)}\\
+&=  \frac{1}{N}\sum_{i=1}^N \frac{\frac{1}{\sqrt{2\pi}}e^{-Y_i^2}\frac{1}{\sqrt{2\pi(1+Y_i^2)}} exp\left(-\frac{(x-Y_i)^2}{2(1+Y_i^2)}\right)w(X_i)}{\frac{1}{\sqrt{2\pi}}e^{-Y_i^2}\frac{1}{\sqrt{2\pi(1+Y_i^2)}} exp\left(-\frac{(X_i-Y_i)^2}{2(1+Y_i^2)}\right)}\\
+&=  \frac{1}{N}\sum_{i=1}^N exp\left(-\frac{x^2-2xY_i-X_i^2+2X_iY_i}{2(1+Y_i^2)}\right)w(X_i)\\
+\end{align}

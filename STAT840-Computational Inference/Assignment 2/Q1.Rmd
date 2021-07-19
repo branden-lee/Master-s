@@ -1,0 +1,155 @@
+---
+title: "Assignment 2"
+author: "Branden Lee 20877653"
+date: "21/03/2021"
+header-includes:
+  - \usepackage{amsmath}
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1
+
+#### a)  
+```{r}
+set.seed(0)
+
+# Function whose expectation we are trying to estimate
+delta <- function(x) {
+  (x/25 - 2)/sqrt(2/25) >= 1.645
+}
+
+# Calculate a 95% confidence interval using the mean and variance provided
+ci95 <- function(mean, variance) {
+  mean + qnorm(.975) * sqrt(variance) * c(-1, 1)
+}
+
+# Simple Monte Carlo estimate
+simple_mc <- function(true_param)  {
+  mc_sample <- rpois(n=1000, lambda=25 * true_param)
+  est <- mean(sapply(mc_sample, delta))
+  var <- (est - est^2)/1000
+  ci <- ci95(est, var)
+  c(est, var)
+}
+
+# Importance Sampling Estimate
+importance_estimate <- function(true_param) {
+  sample <- rpois(n=1000, lambda=25*(sqrt(2/25)*1.645+true_param))
+  delta_importance <- sapply(sample, FUN=delta)
+  weights <- dpois(sample, lambda=25*true_param) /
+                           dpois(sample, lambda=25*(sqrt(2/25)*1.645+true_param))
+  est <- mean(delta_importance * weights)
+  var <- (mean((delta_importance * weights)^2) - est^2) / 1000
+  c(est, var)
+}
+
+# Antithetic estimate
+antithetic_estimate <- function(true_param) {
+  unif_sample <- runif(1000)
+  sample1 <- qpois(unif_sample, lambda=25*true_param)
+  sample2 <- qpois(1 - unif_sample, lambda=25*true_param)
+  
+  delta1 <- sapply(sample1, delta)
+  delta2 <- sapply(sample2, delta)
+  
+  est1 <- mean(delta1)
+  est2 <- mean(delta2)
+  est <- (est1 + est2) / 2
+  
+  var1 <- (est1 - est1^2) / 1000
+  var2 <- (est2 - est2^2) / 1000
+  cov <- mean((delta1 - est1) * (delta2 - est2)) / 999
+  var <- (var1 + var2) / 4 + cov / 2
+  
+  c(est, var)
+}
+
+# Control variate estimate
+cv_estimate <- function(true_param) {
+sample <- rpois(1000, lambda=25*true_param)
+
+delta_simple <- sapply(sample, delta)
+delta_control <- sample / 25
+
+est_simple <- mean(delta_simple)
+est_control <- mean(delta_control)
+
+var_simple <- (mean(delta_simple^2) - est_simple^2) / 1000
+var_control <- (mean(delta_control^2) - est_control^2) / 1000
+cov_control <- mean((delta_simple - est_simple) * (delta_control - est_control)) / 999
+
+alpha <- - cov_control / var_control
+
+est <- est_simple + alpha * (est_control - true_param)
+var <- var_simple + 2 * alpha * cov_control + alpha ^ 2 * var_control
+
+c(est, var)
+}
+
+mc <- simple_mc(2)
+imp <- importance_estimate(2)
+at <- antithetic_estimate(2)
+cv <- cv_estimate(2)
+```
+The results of the simulations can be found in the table below. The parameter of interest is 
+$$P(\text{reject }H_0\mid H_0\text{ true}) = P\left(\tfrac{\overline{X}-2}{\sqrt{2/25}}\geq 1.645\mid \lambda=2\right)$$
+Note that $Y=\sum_{i=1}^{25}X_i\sim Poisson(50)$. If $\delta(y)=I\left(\frac{y/25-2}{\sqrt{2/25}}\right)$, then the type 1 error rate can be expressed as an expectation with respect to $Y$:
+$$P\left(\frac{\overline{X}-2}{\sqrt{2/25}}\geq 1.645\mid \lambda=2\right) = \sum_{y=0}^\infty \delta(y)P(Y=y)$$
+Thus rather than simulating 1000 samples of 25 $Poisson(2)$ random variables, the simulation was done by generating 1000 $Poisson(50)$ random variables:  
+For the simple Monte Carlo estimate, a sample was taken from $Poisson(50)$.   
+For the antithetic approach, a sample $U_i\sim Unif(0,1)$ was selected, and the transformations 
+$$Y_{1i}=F^{-1}(U_i),\quad Y_{2i}=F^{-1}(1-U_i)$$
+where $F$ is the cdf corresponding to $Poisson(50)$, were applied to obtain negatively correlated $Poisson(50)$ random variables.  
+For the importance sampling approach, a sample from $Poisson(25 * 2.4653)$ was selected to use as the envelope.  
+For the control variate method, the control variate used was $\eta(Y)=Y/25=\overline{X}$. It is expected that $\eta(Y)$ is positively correlated with $\delta(Y)=I\left(\frac{Y/25-2}{\sqrt{2/25}}\right)$: a larger sample mean will more likely result in the indicator being 1 and vice versa. Indeed, the use of this control variate results in a considerable improvement in variance as expected.
+
+Importance sampling, antithetic and control variates all resulted in a reduction of variance in the estimates in comparison to simple Monte Carlo as expected, with importance sampling being particularly effective. It may be possible to improve the performance of the control variate method by choosing a control variate $\eta'(X)$ that is more positively correlated with $\delta(X)$.
+```{r echo=FALSE}
+format_interval <- function(x) {
+  paste0('(', round(x[1], 5), ', ', round(x[2], 5), ')')
+}
+
+knitr::kable(
+rbind(c('Simple MC', mc[1], mc[2], format_interval(ci95(mc[1], mc[2]))),
+      c('Importance Sampling', imp[1], imp[2], format_interval(ci95(imp[1], imp[2]))),
+      c('Antithetic Sampling', at[1], at[2], format_interval(ci95(at[1], at[2]))),
+      c('Control Variate', cv[1], cv[2], format_interval(ci95(cv[1], cv[2])))),
+col.names=c('Method', 'Estimate', 'Variance', '$95\\% CI$'),
+caption="Monte Carlo Estimates",
+digits=5
+  )
+```
+
+
+#### b)  
+```{r}
+library(ggplot2)
+
+plot_power <- function(mc_method, title) {
+  x = seq(2.2, 4, .005)
+  y <- sapply(x, mc_method)
+  ci <- apply(y, 2, function(x) ci95(x[1], x[2]))
+  df <- data.frame(lambda=x, estimates=y[1,], lower=ci[1,], upper=ci[2,])
+  ggplot(data=df, aes(lambda)) + geom_ribbon(aes(ymin=lower, ymax=upper), fill='white') +
+    geom_line(aes(y=estimates)) + ylim(0, 1.15) +
+    labs(title=title, x=expression(lambda), y='Power')
+}
+p1 <- plot_power(simple_mc, 'Simple Monte Carlo')
+p2 <- plot_power(importance_estimate, 'Importance Sampling')
+p3 <- plot_power(antithetic_estimate, 'Antithetic Variate')
+p4 <- plot_power(cv_estimate, 'Control Variate')
+```
+The plots of the power curve using each of the Monte Carlo methods can be found below. While importance sampling did a good job in estimating the probability of type 1 error, it performs increasingly poorly when calculating the power as $\lambda$ gets larger both in terms of the stability of the estimate (smoothness of the estimated power curve) as well as the variance of the estimate. It's important to note that the envelope used was $Poisson(25*(\sqrt{2/25}*1.645+\lambda))$, which was based on the a) predetermined significance level of the test and b) the true value of $\lambda$: it's possible a different envelope may result in a uniformly more stable and less variable curve. Both the antithetic and control variate approaches seem to perform uniformly better than the simple Monte Carlo approach, with the antithetic approach in particular resulting in a relatively smooth power curve and for the large part having a uniformly small variance throughout the range of $\lambda$ considered.
+
+```{r echo=FALSE}
+p1
+p2
+p3
+p4
+```

@@ -1,0 +1,77 @@
+---
+title: "STAT840 A1Q7"
+author: "Branden Lee 20877653 Gradute student"
+date: "14/02/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+set.seed(0)
+
+ci95 <- function(mean, variance) {
+  mean + qnorm(.975) * sqrt(variance) * c(-1, 1)
+}
+```
+
+#### a)
+```{r}
+# Integrand of interest
+delta <- function(x)  x^2 * exp(-x^2/2) / sqrt(2*pi)
+
+# Importance function
+g <- function(x) if (x > 1) {dnorm(x) / (1-pnorm(1))} else {0}
+
+# Envelope function and relevant parameters
+lambda <- 1
+M <- exp(.5 * lambda ^ 2) / (sqrt(2 * pi) * lambda * (1 - pnorm(1)))
+envelope <- function(x) M * dexp(x, rate=lambda)
+
+# Rejection/Acceptance sample
+sample1 = c()
+while (length(sample1) < 1000) {
+  X <- rexp(1, rate=lambda)
+  if (runif(1) <= g(X) / envelope(X)) {
+    sample1 = c(sample1, X)
+  }
+}
+
+estimate1 <- mean(sapply(sample1, FUN=function(x) x^2 * (1 - pnorm(1))))
+```
+To estimate this integral using importance sampling, first we have to generate a sample from the truncated normal distribution. We can sample from this distribution using rejection/acceptance sampling: let $g_0(x)=\lambda e^{-\lambda x}$.
+$\implies M=sup_{x>0}\frac{g(x)}{g_0(x)}=\frac{1}{\lambda\sqrt{2\pi}(1-\Phi(1))}sup_{x>0}e^{-x^2/2+\lambda x}=\frac{1}{\lambda\sqrt{2\pi}(1-\Phi(1))}sup_{x>0}e^{-x^2/2+\lambda x}$  
+The supremum occurs for x such that $\frac{d}{dx} e^{-x^2/2+\lambda x}=(-x+\lambda)e^{-x^2/2+\lambda x}=0\implies x=\lambda$  
+$\implies M=\frac{e^{\lambda^2/2}}{\lambda\sqrt{2\pi}(1-\Phi(1))}$  
+To find the value of $\lambda$ that maximizes the acceptance probability:  
+$h(\lambda)=\frac{e^{\lambda^2/2}}{\lambda} \implies h'(\lambda)=e^{\lambda^2/2}-\frac{e^{\lambda^2/2}}{\lambda^2}$  
+Solving for $h'(\lambda)=0$, we get $\lambda=1$ is the optimal value, and $M=\frac{e^{1/2}}{\sqrt{2\pi}(1-\Phi(1))}$  
+
+The estimate of $\theta$ using importance sampling is $\widehat{\theta}_1 = \frac{1}{1000}\sum_{i=1}^{1000} X_i^2 (1-\Phi(1))=`r estimate1`$
+
+#### b)
+```{r}
+sample2 <- sqrt(rexp(1000, .5) + 1)
+
+delta2 <- function(x) x / (sqrt(2 * pi) * exp(.5))
+
+estimate2 <- mean(sapply(sample2, FUN=delta2))
+```
+Note for $Y = \sqrt{X + 1}$ where $X\sim Exp(0.5)$. Then $Y\in[1,\infty)$, and by change of variables $$f_Y(y) = f_X(y^2-1)|\frac{d}{dy}(y^2-1)| = \frac{1}{2}e^{-\frac{y^2 - 1}{2}}|2y| = y e^{\frac{1-y^2}{2}}$$ so we can sample from $h(x)$ by sampling from $Exp(0.5)$ and then transforming them as above. Using importance sampling, an estimate of $\theta$ is given by 
+$$\widehat{\theta}_2=\frac{1}{1000} \sum_{i=1}^{1000} \frac{X_i^2 exp(-X_i^2/2)/\sqrt{2\pi}}{X_i exp(\frac{1-X_i^2}{2})} = \frac{1}{1000} \sum_{i=1}^{1000} \frac{X_i }{\sqrt{2\pi}exp(1/2)}=`r estimate2`$$
+
+
+#### c)
+```{r}
+second_moment1 <- sapply(sample2, FUN=function(x) (x^2 * (1 - pnorm(1)))^2)
+se1 <- sqrt((mean(second_moment1) - estimate1^2) / 1000)
+
+second_moment2 <- sapply(sample2, FUN=function(x) delta2(x)^2)
+se2 <- sqrt((mean(second_moment2) - estimate2^2) / 1000)
+```
+The standard errors for the estimators from part a and b are `r se1` and `r se2` respectively.  
+Since the expectations of both estimators are equal, the estimates should be quite similar so to compare the standard errors it suffices to compare $\frac{c_1^2}{1000}\sum_{i=1}^{1000} X_i^4$ and $\frac{c_2^2}{1000} \sum_{i=1}^{1000} X_i^2$, where $c_1=1-\Phi(1)\approx.025$ and $c_2=\frac{1}{\sqrt{2\pi e}}\approx.0585$. The former is quartic in the $X_i$, so when a large $X_i$ is sampled it increases the variance of the estimator from part a) much more than if the same value was sampled for the estimator from part b) as the latter is only quadratic in the data. Note $.025X_i^4>.0585X_i^2\implies X_i>1.53$, and as can be seen in the plot below this region corresponds to a region of reasonably high probability, that is observing values that increase the variance dramatically due to the quartic terms is quite common, which explains the larger variance for the estimator in part a.

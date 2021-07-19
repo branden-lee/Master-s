@@ -1,0 +1,174 @@
+---
+title: "Assignment 2 Supplement"
+author: "Branden Lee 20877653"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Question 5
+
+##### a)
+```{r}
+# for testing purposes
+set.seed(0)
+
+# creating variables for repeatedly used numbers
+p <- 16 
+N <- 500
+beta <- c(0.5, 0.75, 0.25, 0.5, 0.75, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+expit <- function(x) {
+  exp(x) / (1 + exp(x))
+}
+
+# Generates n by 16 design matrix with entries from N(0,1)
+generateCovariates <- function(n) {
+  return(matrix(c(rep(1, n), rnorm((p - 1) * n)), ncol = p,
+              dimnames = list(c(seq(1, n)), c(paste('x', seq(0,15), sep='')))))
+}
+
+# Main function that is called to simulate a design matrix (dimension 
+# n * 16) numSimulations times, and for each simulation fit the model specified 
+# by modelType ('linear' or 'logistic'). 
+# Argument 'Variables' is a vector of strings that indicates which covariates 
+# are used to fit the model for the given simulation. Returns a matrix
+# whose kth row is the vector of regression coefficients corresponding to the
+# kth simulation.
+simulate <- function(variables, sampleSize, numSimulations, modelType) {
+  
+  # empty matrix to be updated in loop below
+  modelCoef <- matrix(, ncol=2, nrow=numSimulations, dimnames=list(c(), c('beta1', 'se')))
+  
+  # creates formula string to be used in glm()
+  formula <- paste("resp~", paste(variables, collapse='+')) 
+  
+  # loop that generates data, fits model and records regression coefficients
+  for (m in seq(1, numSimulations)) {
+    X <- generateCovariates(sampleSize)
+    piTrue <- expit(X %*% beta) # true probability
+    
+    df <- data.frame(X)
+    
+    # generate response and fit model depending on modelType parameter provided
+    if (modelType == 'logistic') {
+      df$resp <- rbinom(sampleSize, 1, piTrue)
+      model <- glm(as.formula(formula), family=binomial, data=df)
+    } else if (modelType == 'linear') {
+      df$resp <- rnorm(sampleSize, mean=X %*% beta)
+      model <- lm(as.formula(formula), data=df)
+    } else {
+      stop('Invalid model type')
+    }
+    
+    modelCoef[m,] <- c(summary(model)$coefficients[2,seq(1,2)])
+  }
+  return(modelCoef)
+}
+
+# Calculates average percent bias assuming the  input x is a matrix whose 
+# first column is a vector of predicted beta1s and whose second column is a 
+# vector of their corresponding standard errors.
+averagePercentBias <- function(x) {
+  sum(x[,1] - beta[2]) / (beta[2] * length(x[,1]))
+}
+
+# Calculates the 95% confidence interval coverage probability assuming the
+# input x is a matrix whose first column is a vector of predicted beta1s and
+# whose second column is a vector of their corresponding standard errors.
+ciCoverageProbability <- function(x) {
+    # Indicator for whether true value of beta1 is in the 95% CI.
+  # y is assumed to be a 2 dimensional vector whose first argument
+  # is the predicted value of beta1 and the second argument is its
+  # standard error.
+  indicator <- function(y) {
+    lower <- y[1] - y[2] * qnorm(.975)
+    upper <- y[1] + y[2] * qnorm(.975)
+    
+    if (beta[2] < lower || beta[2] > upper) {
+      return(0)
+    }
+    return(1)
+  }
+  sum(apply(x, 1, indicator)) / nrow(x)
+}
+
+# Calculates the average standard error assuming the input x is a matrix 
+# whose first column is a vector of predicted beta1s and whose second 
+#column is a vector of their corresponding standard errors.
+averageStandardError <- function(x) {
+  sum(x[,2]) / length(x[,2])
+}
+
+
+# Simulate data and generate beta1s and their standard errors.
+model1100 <- simulate('x1', 100, 500, 'logistic')
+model2100 <- simulate(c('x1', 'x2', 'x3', 'x4', 'x5'), 100, 500, 'logistic')
+model3100 <- simulate('.', 100, 500, 'logistic')
+model1500 <- simulate('x1', 500, 500, 'logistic')
+model2500 <- simulate(c('x1', 'x2', 'x3', 'x4', 'x5'), 500, 500, 'logistic')
+model3500 <- simulate('.', 500, 500, 'logistic')
+```
+
+\begin{center}
+\begin{tabular}{l|rrr|rrr}
+\hline
+Variables& \multicolumn{3}{c|}{$n=100$}&\multicolumn{3}{c}{$n=500$}\\
+ Included& \% Bias & 95\% CI Coverage & ASE& \% Bias & 95\% CI Coverage & ASE\\
+\hline
+$x_1$ only & `r averagePercentBias(model1100)` & `r ciCoverageProbability(model1100)` & `r averageStandardError(model1100)` & `r averagePercentBias(model1500)` & `r ciCoverageProbability(model1500)` & `r averageStandardError(model1500)` \\
+$x_1,\ldots,x_5$ & `r averagePercentBias(model2100)` & `r ciCoverageProbability(model2100)` & `r averageStandardError(model2100)` & `r averagePercentBias(model2500)` & `r ciCoverageProbability(model2500)` & `r averageStandardError(model2500)` \\
+$x_1,\ldots,x_{15}$ & `r averagePercentBias(model3100)` & `r ciCoverageProbability(model3100)` & `r averageStandardError(model3100)` & `r averagePercentBias(model3500)` & `r ciCoverageProbability(model3500)` & `r averageStandardError(model3500)` \\
+\hline
+\end{tabular}
+\end{center}
+
+##### b)
+Overall, the model fitted with covariates $x_1,x_2, x_3,x_4$ & $x_5$ results in the lowest average percentage bias among the three models as well as the best 95% confidence interval coverage probability. The average standard error decreased as fewer variables were included in the model and as the number of events increased.
+For the model with just $x_1$:  
+- the average percent bias increased relative to that of model including important variables  
+- the 95% confidence interval coverage probability decreased relative to that of model including important variables  
+- the average standard error decreased relative to that of model including important variables  
+For the model with all variables:  
+- the average percent bias increased relative to that of model including important variables  
+- the 95% confidence interval coverage probability decreased relative to that of model including important variables  
+- the average standard error increased relative to that of model including important variables
+
+##### c)
+
+```{r}
+linearModel1100 <- simulate('x1', 100, 500, 'linear')
+linearModel2100 <- simulate(c('x1', 'x2', 'x3', 'x4', 'x5'), 100, 500, 'linear')
+linearModel3100 <- simulate('.', 100, 500, 'linear')
+linearModel1500 <- simulate('x1', 500, 500, 'linear')
+linearModel2500 <- simulate(c('x1', 'x2', 'x3', 'x4', 'x5'), 500, 500, 'linear')
+linearModel3500 <- simulate('.', 500, 500, 'linear')
+```
+
+\begin{center}
+\begin{tabular}{l|rrr|rrr}
+\hline
+Variables& \multicolumn{3}{c|}{$n=100$}&\multicolumn{3}{c}{$n=500$}\\
+ Included& \% Bias & 95\% CI Coverage & ASE& \% Bias & 95\% CI Coverage & ASE\\
+\hline
+$x_1$ only & `r averagePercentBias(linearModel1100)` & `r ciCoverageProbability(linearModel1100)` & `r averageStandardError(linearModel1100)` & `r averagePercentBias(linearModel1500)` & `r ciCoverageProbability(linearModel1500)` & `r averageStandardError(linearModel1500)` \\
+$x_1,\ldots,x_5$ & `r averagePercentBias(linearModel2100)` & `r ciCoverageProbability(linearModel2100)` & `r averageStandardError(linearModel2100)` & `r averagePercentBias(linearModel2500)` & `r ciCoverageProbability(linearModel2500)` & `r averageStandardError(linearModel2500)` \\
+$x_1,\ldots,x_{15}$ & `r averagePercentBias(linearModel3100)` & `r ciCoverageProbability(linearModel3100)` & `r averageStandardError(linearModel3100)` & `r averagePercentBias(linearModel3500)` & `r ciCoverageProbability(linearModel3500)` & `r averageStandardError(linearModel3500)` \\
+\hline
+\end{tabular}
+\end{center}
+
+The 95% confidence interval coverage probabilities all sit at around the same level of 94-95% regardless of the model or the number of observations. Furthermore, the lowest average standard error is achieved by the model that includes only the important explanatory variables and is reduced as the number of observations increases.
+
+Comparing the results of the logistic models and the linear models, it seems that the logistic models are much more sensitive to the inclusion/exlusion of important/unimportant explanatory variables as can be seen in the average percent bias and the 95% confidence interval coverage probability. On the other hand, the linear model is relatively insensitive as the measures do not change as drastically when the model changes.
+
+
+
+
+ 

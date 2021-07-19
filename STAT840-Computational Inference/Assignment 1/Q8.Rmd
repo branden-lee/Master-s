@@ -1,0 +1,89 @@
+---
+title: "STAT840 A1Q8"
+author: "Branden Lee 20877653 Graduate student"
+date: "14/02/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### a)
+```{r}
+set.seed(0)
+
+# Calculate the 95% confidence interval given estimated mean and variance
+ci95 <- function(mean, variance) {
+  mean + qnorm(.975) * sqrt(variance) * c(-1, 1)
+}
+
+delta <- function(x) {
+  x^2 * cos(x^2)
+}
+
+simple_mc_estimate <- function(size, num_of_times) {
+  sample <- as.data.frame(matrix(rexp(size * num_of_times, 25), ncol = size))
+  
+  # Calculate mc estimate
+  f_x <- apply(sample, MARGIN=c(1,2), FUN=delta)
+  estimate <- apply(f_x, MARGIN=1, FUN=mean)
+  
+  
+  # Calculate variance of estimate
+  f2_x <- apply(sample, MARGIN=c(1,2), FUN=function(x) delta(x)^2)
+  variance <- (apply(f2_x, MARGIN=1, FUN=mean) - estimate^2) / size
+  
+  cbind(estimate, variance)
+}
+
+theta1 <- simple_mc_estimate(10000, 1)
+ci1 <- ci95(theta1[1], theta1[2])
+```
+The Monte Carlo estimate of $\theta$ is $\widehat{\theta}_{AS}=`r theta1[1]`$ with variance `r theta1[2]` and 95% confidence interval (`r ci1`).
+
+#### b)
+```{r}
+# Used to transform uniform random variable to the relevant exponential
+rv_transform <- function(x) {
+  -log(1-x) / 25
+}
+
+antithetic_estimate <- function(size, num_of_times) {
+  unif_sample <- as.data.frame(matrix(rep(runif(size), num_of_times), ncol=size))
+  sample1 <- apply(unif_sample, MARGIN=c(1,2), FUN=rv_transform)
+  sample2 <- apply(unif_sample, MARGIN=c(1,2), FUN=function(x) rv_transform(1-x))
+  
+  f_x1 <- apply(sample1, MARGIN=c(1,2), FUN=delta)
+  estimate1 <- apply(f_x1, MARGIN=1, FUN=mean)
+  f_x2 <- apply(sample2, MARGIN=c(1,2), FUN=delta)
+  estimate2 <- apply(f_x2, MARGIN=1, FUN=mean)
+  
+  f2_x1 <- apply(sample1, MARGIN=c(1,2), FUN=function(x) delta(x)^2)
+  variance1 <- (apply(f2_x1, MARGIN=1, FUN=mean) - estimate1^2) / size
+  f2_x2 <- apply(sample2, MARGIN=c(1,2), FUN=function(x) delta(x)^2)
+  variance2 <- (apply(f2_x2, MARGIN=1, FUN=mean) - estimate2^2) / size
+  
+  estimate <- (estimate1 + estimate2) / 2
+  
+  covariance <- apply((f_x1 - estimate1) * (f_x2 - estimate2), 
+                      MARGIN=1, FUN=function(x) mean(x)/(size-1))
+  variance <- (variance1 + variance2) / 4 + covariance / 2
+
+  cbind(estimate, variance)
+}
+theta2 <- antithetic_estimate(1000, 1)
+ci2 <- ci95(theta2[1], theta2[2])
+```
+Since $U=F(X)\sim Uniform(0,1)$ where $X\sim Exp(25)$ and $F(x)$ is the cdf of $X$, we can generate the antithetic exponential variates using the inverse of the cdf, that is sampling from the uniform distribution then transforming them by $X=F^{-1}(U)=-\frac{1}{25}log(1-U)$ and similarly $X\sim F^{-1}(1-U)=-\frac{1}{25}log(U)$. The antithetic estimate of $\theta$ is $\widehat{\theta}_{AS}=`r theta2[1]`$ with variance `r theta2[2]` and 95% confidence interval (`r ci2`). Note that for this particular simulation the variance is larger than the one obtained in part a for simple Monte Carlo, which can likely be attributed to the sample itself and not the method.
+
+#### c)
+```{r}
+simple_mc_ave_var <- mean(simple_mc_estimate(10000, 1000)[,2])
+antithetic_estimate_ave_var <- mean(antithetic_estimate(10000, 1000)[,2])
+simple_mc_ave_var
+antithetic_estimate_ave_var
+```
+The use of an antithetic exponential variate results in a 60% reduction in the average variance.

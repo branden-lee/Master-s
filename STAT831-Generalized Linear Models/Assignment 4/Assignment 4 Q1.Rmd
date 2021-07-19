@@ -1,0 +1,108 @@
+---
+title: "Assignment 4"
+author: "Branden Lee 20877653"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(GLMsData)
+library(ggplot2)
+library(MASS)
+```
+
+### Question 1
+
+#### (a)
+```{r}
+data(galapagos)
+
+hist(x=galapagos$Plants, freq=FALSE, breaks=15, 
+     main='Relative Probabilities of Island Plant Counts',
+     xlab='Number of Plants', ylab='Probability', ylim=c(0,.05))
+x <- seq(0, 480, 5)
+y <- sapply(x, function(q) dpois(q, lambda=mean(galapagos$Plants)))
+points(x, y, cex=.75)
+```
+The naive Poisson distribution with lambda the sample mean is very different from the sample frequencies: the sample is more right skewed with a heavier tail while the naive Poisson distribution is heavily concentrated near its mean with tails that converge to 0 very quickly.
+
+#### (b)
+```{r}
+model1 <- glm(Plants ~ log(Area) + log(Elevation) + log(Nearest) + log(StCruz+0.1) +
+               log(Adjacent), family=poisson, data=galapagos)
+summary(model1)
+
+fv <- model1$fitted.values
+rd <- residuals.glm(model1, 'deviance')
+
+plot1 <- ggplot(data.frame(fitted=fv, resid=rd), aes(x=fitted, y=resid)) +
+  geom_point() + ylab('Deviance Residual') + xlab('Fitted Values') +
+  geom_hline(yintercept=c(1.96,-1.96), linetype='dashed') +
+  ggtitle('Deviance Residuals')
+plot1
+```
+Both the deviance statistic and the deviance residuals suggest there is overdispersion. The deviance statistic is very large compared to its degrees of freedom
+$$\Delta D = `r model1$deviance` >> `r model1$df.residual` = E(\chi_{`r model1$df.residual`}^2)$$
+while the residual plot demonstrates that there are an excessive number of large residuals.
+
+#### (c)
+```{r}
+disp <- model1$deviance / model1$df.residual
+seAdj <- sqrt(disp) * summary(model1)$coef[,2]
+pValAdj <- pnorm(model1$coef/ seAdj, lower.tail=FALSE)
+pValAdj
+```
+The estimate of $\phi$ is $\hat{\phi}=`r disp`$. After accounting for overdispersion, only (the log of) area is statistically significant.
+
+#### (d)
+```{r}
+model2 <- glm.nb(Plants ~ log(Area) + log(Elevation) + log(Nearest) + log(StCruz+0.1) +
+               log(Adjacent), data=galapagos)
+summary(model2)
+
+fv <- model2$fitted.values
+rd <- residuals.glm(model2, 'deviance')
+plot2 <- ggplot(data.frame(fitted=fv, resid=rd), aes(x=fitted, y=resid)) +
+  geom_point() + ylab('Deviance Residual') + xlab('Fitted Values') +
+  geom_hline(yintercept=c(1.96,-1.96), linetype='dashed') +
+  ggtitle('Deviance Residuals')
+plot2
+```
+Both the summary of the negative binomial model and the deviance residuals agree with the conclusions model from the fit of the initial model. That is, there does seem to be overdispersion in the data, and accounting for this overdispersion results in (the log of) area being the only statistically significant explanatory variable and much more reasonable deviance residuals. However, only log(Area) is statistically significant, which suggests removing covariates to see if a simpler model can provide a similar fit.
+
+#### (e)
+```{r}
+# Model with just log(area)
+model3 <- glm.nb(Plants ~ log(Area), data=galapagos)
+pVal1 <- pchisq(-(model3$twologlik-model2$twologlik), df=4, lower.tail=FALSE)
+
+# Wald tests for determining whether additional covariates need to be added to the
+# log(area) model
+models <- lapply(c('log(Elevation)', 'log(Nearest)', 'log(StCruz+0.1)',
+               'log(Adjacent)'), function(x) {
+                 glm.nb(formula(paste('Plants~log(Area)+', x)),
+                        data=galapagos)
+               })
+pVal2 <- sapply(models, function(x) 
+  summary(x)$coef[3,4])
+
+est <- exp(model3$coef[2])
+ci <- est * exp(c(-1, 1) * qnorm(0.975) * summary(model3)$coef[2,2])
+```
+First, the negative binomial model with just log(area) was compared with the model with all main effects using a likelihood ratio test. The $p$-value for this test is `r pVal1`, so we can conclude that the model with just log(area) is adequate compared to the main effects model. To see if any additional covariates should be included, 4 additional models were fitted by including an additional covariate and Wald tests were performed to determine whether the additional covariate was statistically significant. None of the $p$ values for these tests were statistically significant, and the residual plot for this model is reasonable so the conclusion is that the log(area) model provides the best fit to the data.
+
+This model was fitted since the poisson model couldn't account for the extra variance found in the data. $e^{\beta_1}$ can be interpreted as the ratio of the relative rate of plants found on one island versus another and the ratio of the areas of the islands. An estimate for this ratio $e^{\beta_1}$ is $e^{\hat{\beta}_1}$=`r est`, and a 95% confidence interval for this estimate is `r ci`.
+
+```{r}
+fv <- model3$fitted.values
+rd <- residuals.glm(model3, 'deviance')
+plot2 <- ggplot(data.frame(fitted=fv, resid=rd), aes(x=fitted, y=resid)) +
+  geom_point() + ylab('Deviance Residual for Final Model') + xlab('Fitted Values') +
+  geom_hline(yintercept=c(1.96,-1.96), linetype='dashed') +
+  ggtitle('Deviance Residuals')
+plot2
+```

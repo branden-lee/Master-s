@@ -1,0 +1,79 @@
+---
+title: "STAT931 Assignment 2"
+author: "Branden Lee 20877653"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Question 3
+
+#### a)
+```{r}
+freq <- c(38,12,102,141,12,9,136,383)
+
+arr <- array(c(matrix(freq[1:4], nrow=2, byrow=TRUE),
+               matrix(freq[5:8], nrow=2, byrow=TRUE)), dim=c(2,2,2))
+
+or <- apply(arr, 3,  function(M) {(M[1,1] * M[2,2] / (M[1,2] * M[2,1]))})
+```
+Low income stratum: $\hat{\psi}_{1} = \frac{38 \cdot 141}{12 \cdot 102} = `r or[1]`$  
+High income stratum: $\hat{\psi}_{2} = \frac{12 \cdot 383}{9 \cdot 136} = `r or[2]`$
+
+
+#### b)
+```{r}
+df <- data.frame(
+  income <- rep(c(rep(1,4),rep(2,4)), freq),
+  disease <- rep(rep(c(1,0,1,0),2), freq),
+  exposure <- rep(rep(c(1,1,0,0),2), freq)
+)
+
+library(survival)
+
+model <- clogit(exposure ~ disease + strata(income), data=df)
+orCMLE <- summary(model)$coefficients[2]
+
+orMH <- (38*141 / 293 + 12*383 / 540) / (12*102 / 293 + 9 * 136 / 540)
+
+w <- apply(arr, 3,  function(M) {(sum(1 / M))^-1})
+orWoolf <- exp(sum(w * log(or)) / sum(w)) 
+```
+
+$$\hat{\psi}_{CMLE} = `r orCMLE`, \quad \hat{\psi}_{MH} = `r orMH`, \quad \hat{\psi}_{W} = `r orWoolf`$$
+We can see that the odds ratios estimates after adjusting for income are very similar, while comparing with those from the individual income stratum we see similar estimates but with relatively more variation. 
+
+
+#### c)
+Comparing the odds ratio estimates for each stratum found in a) with those calculated after adjusting for income in b), the estimates are on the same scale relatively and suggest a relationship between biomass fuel exposure and tuberculosis. Furthermore, the pooled estimate of `r (38+12) * (383+141) / ((102+136)*(12 + 9))` is slightly larger than the adjusted estimates but are in agreement that a relationship exists. Thus income does not seem to be a confounder.
+
+
+#### d)
+```{r}
+  scoreStat <- mantelhaen.test(arr, exact=FALSE, correct=FALSE)$statistic
+
+  woolfStat <- log(orWoolf) * sqrt(sum(w))
+```
+##### i) 
+Under the null hypothesis $H_0: \beta = 0$, 
+$$T_1 = \frac{S_c^2(0)}{I_c(0)} \ \dot\sim \ \chi^2_1$$
+Since $T_1 = `r scoreStat` > `r qchisq(.95, df=1)` = \chi^2_1(.95)$, where $\chi^2_1(.95)$ is the 95th percentile of the $\chi^2_1$ distribution, we reject the null hypothesis.
+
+##### ii)
+Under the null hypothesis $H_0: \beta = 0$,
+$$T_2 = \frac{log(\hat{\psi}_w)}{\sqrt{(w_1 + w_2)^{-1}}} \ \dot\sim \ N(0,1)$$
+Since $|T_2| = |`r woolfStat`| > `r qnorm(.975)` = Z_{.975}$, where $Z_{.975}$ is the 97.5th percentile of the $N(0,1)$ distribution, we reject the null hypothesis
+
+
+#### e)
+```{r}
+woolfHomoStat <- sum(w * (log(or)-log(orWoolf))^2)
+```
+Under the null hypothesis $H_0: \beta_1 = \beta_2$, 
+$$T_W = w_1(log(\hat{\psi}_1) - log(\hat{\psi}_w))^2 + w_2(log(\hat{\psi}_2) - log(\hat{\psi}_w))^2 \ \dot\sim \ \chi^2_{2-1}$$
+Since $T_W = `r woolfHomoStat` < `r qchisq(.95, df=1)` = \chi^2_1(.95)$, we do not reject the null hypothesis.

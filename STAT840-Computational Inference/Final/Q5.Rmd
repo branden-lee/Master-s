@@ -1,0 +1,101 @@
+---
+title: "STAT840 Final Exam"
+author: "Branden Lee"
+date: "4/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 5
+
+#### a)
+```{r}
+set.seed(0)
+
+normal_ci <- function(mean, sd) {
+  mean + sd * qnorm(c(0.05, 0.95))
+}
+
+data <- c(186,181,176,149,184,190,158,139,175,148,152,11,41,153,190,157,131,
+          149,135,132)
+
+se_a <- sqrt(var(data) / length(data))
+ci_a <- mean(data) + qt(c(0.05, 0.95), length(data) - 1) * se_a
+```
+We know that for $X_i\sim N(\mu, \sigma^2)$
+$$\frac{\overline X - \mu}{s/\sqrt n}\sim t_{n-1}$$
+where $s^2$ is the sample variance and $t_{n-1}$ is the $t$ distribution with $n-1$ degrees of freedom. A 90% confidence interval for $\mu$ can then be found using the formula
+$$\overline X) \pm z_{0.95} \frac{s}{\sqrt n}$$
+where $z_{0.95}$ is the .95 quantile of the standard normal distribution.
+
+#### b)
+```{r}
+jackknife <- function(data) {
+  n <- length(data)
+  
+  loo_est <- c()
+  for (i in 1:n) {
+    loo_est <- c(loo_est, mean(data[-i]))
+  }
+  var(loo_est)
+  }
+se_b <- sqrt(jackknife(data))
+ci_b <- normal_ci(mean(data), se_b)
+```
+
+#### c)
+```{r}
+normal_bootstrap <- function(data, B) {
+  n <- length(data)
+  mean <- mean(data)
+  
+  bootstrap_est <- c()
+  for (b in 1:B) {
+    s <- sample(data, n, replace=TRUE)
+    bootstrap_est <- c(bootstrap_est, mean(s))
+  }
+  var(bootstrap_est)
+  }
+se_c <- sqrt(normal_bootstrap(data, 10000))
+ci_c <- normal_ci(mean(data), se_c)
+```
+
+#### d)
+```{r}
+percentile_bootstrap <- function(data, B) {
+  n <- length(data)
+  
+  bootstrap_est <- c()
+  for (b in 1:B) {
+    s <- sample(data, n, replace=TRUE)
+    bootstrap_est <- c(bootstrap_est, mean(s))
+  }
+  quantile(bootstrap_est, c(0.05, 0.95))
+}
+
+ci_d <- percentile_bootstrap(data, 10000)
+```
+
+
+```{r echo=FALSE}
+mean <- mean(data)
+
+format_interval <- function(x) {
+  paste('(', round(x[1], 5), ',', round(x[2], 5), ')')
+}
+
+knitr::kable(
+rbind(c('a) Standard', round(se_a, 5), format_interval(ci_a)),
+      c('b) Normal Jackknife', round(se_b, 5), format_interval(ci_b)),
+      c('c) Normal Bootstrap', round(se_c, 5), format_interval(ci_c)),
+      c('d) Percentile Bootstrap', 'NA', format_interval(ci_d))),
+col.names=c('Type', 'Standard Error', 'CI'),
+caption="Confidence Intervals",
+digits=5
+  )
+```

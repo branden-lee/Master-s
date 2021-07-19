@@ -1,0 +1,82 @@
+---
+title: "Assignment 2"
+author: "Branden Lee 20877653"
+date: "21/03/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Question 4
+
+#### a)
+$$\pi(y,z)\propto\int_0^1{10\choose y}x^{y+z}(1-x)^{10-y}e^{-z}dx = {10\choose y}e^{-z}\int_0^1 x^{y+z}(1-x)^{10-y}dx$$  
+$$\pi(x,z)\propto\sum_{y=0}^{10}{10\choose y}x^{y+z}(1-x)^{10-y}e^{-z}dx = x^ze^{-z}\sum_{y=0}^{10} {10\choose y}x^{y}(1-x)^{10-y}$$  
+$$\pi(x,y)\propto\int_0^\infty{10\choose y} x^{y+z}(1-x)^{10-y}e^{-z}dz={10\choose y}x^y(1-x)^{10-y} \int_0^\infty x^{z}e^{-z}dz$$  
+
+$$\pi(x\mid y, z) = \frac{\pi(x,y,z)}{\pi(y,z)} \propto \frac{{10\choose y}x^{y+z}(1-x)^{10-y}e^{-z}}{{10\choose y}e^{-z}\int_0^1 x^{y+z}(1-x)^{10-y}dx}\propto x^{y+z}(1-x)^{10-y}\sim Beta(y+z+1, 11-y)$$  
+$$\pi(y\mid x, z) = \frac{\pi(x,y,z)}{\pi(x,z)} \propto \frac{{10\choose y}x^{y+z}(1-x)^{10-y}e^{-z}}{x^ze^{-z}\sum_{y=0}^{10} {10\choose y}x^{y}(1-x)^{10-y}}\propto {10\choose y}x^y(1-x)^{10-y}\sim Binomial(10, x)$$  
+$$\pi(y\mid x, z) = \frac{\pi(x,y,z)}{\pi(x,z)} \propto \frac{{10\choose y}x^{y+z}(1-x)^{10-y}e^{-z}}{{10\choose y}x^y(1-x)^{10-y} \int_0^\infty x^{z}e^{-z}dz}\propto x^ze^{-z}=e^{-(1-log(x))z}\sim Exponential(1-log(x))$$  
+
+#### b)
+Algorithm outlining a Gibbs sampler for sampling from the specified distribution:  
+1) Set $n=0$ initial point $v_n = (x_n, y_n, z_n)$  
+2) Sample $x_{n+1}$ from $Beta(y_{n} + z_{n} + 1, 11 - y_{n})$  
+3) Sample $y_{n+1}$ from $Binomial(10, x_{n+1})$  
+4) Sample $z_{n+1}$ from $Exponential(1-log(x_{n+1}))$  
+5) Set $v_{n+1}=(x_{n+1}, y_{n+1}, z_{n+1})$  
+6) Set $n=n+1$, and go back to step 2 until the desired number of samples N is obtained  
+7) Return the sample ${v_n, ..., v_N}$  
+Note since this is a Gibbs sampler we can be certain that the stationary distribution of this chain is $\pi(x,y,z)$.  
+
+#### c)
+```{r}
+set.seed(0)
+
+generate_sample <-  function(init, sample_size) {
+  x <- init[1]
+  y <- init[2]
+  z <- init[3]
+  
+  sample <- matrix(init, nrow=1)
+  
+  while (nrow(sample) < sample_size) {
+    # Sample from full conditionals
+    x <- rbeta(1, y + z + 1, 11 - y)
+    y <- rbinom(1, size=10, prob=x)
+    z <- rexp(1, 1-log(x))
+  
+    sample <- rbind(sample, c(x, y, z))
+  }
+  return(sample)
+}
+
+sample <- generate_sample(c(.5, 5, 2), 12000)
+```
+Looking at the time series plots for marginals, it seems that the Gibbs sampler converges within 1000 steps i.e. quite quickly as the chain seems to stabilise beyond that point. Furthermore, the relative frequencies of the last 10000 steps in the chain also appear to be converging to well behaved distributions, which further supports convergence. Various initial points were tried to see if the result varied: for the most part both time series plots and histograms of the resulting empirical distribution were very similar. The final sample used consisted of 10000 observations from the chain after discarding the first 2000.
+
+```{r echo=FALSE}
+plot(x=seq(nrow(sample)), y=sample[,1], type='l', xlab='t', 
+     ylab=expression(X[t]), main='Time Series Plot of X')
+plot(x=seq(nrow(sample)), y=sample[,2], type='l', xlab='t', ylab=expression(Y[t])
+     , main='Time Series Plot of Y')
+plot(x=seq(nrow(sample)), y=sample[,3], type='l', xlab='t', ylab=expression(Z[t])
+     , main='Time Series Plot of Z')
+
+x <- sample[2001:12000,1]
+y <- sample[2001:12000,2]
+z <- sample[2001:12000,3]
+hist(x, freq=FALSE, main='Marginal Empirical Density of X')
+barplot(prop.table(table(y)), xlab='y', ylab='P(Y=y)', main='Marginal Empirical Density of Y')
+hist(z, freq=FALSE, main='Marginal Empirical Density of Z')
+```
+
+### d)
+```{r}
+est <- mean(apply(sample[2001:12000,], MARGIN=1, FUN=function(x) x[3]^2 * x[2]^3 * exp(-x[1]^2)))
+```
+We can estimate $E(Z^2Y^3e^{-X^2})$ by $\frac{1}{10000}\sum_{i=1}^{10000} Z_i^2Y_i^3e^{X_i^2}$, giving us $E(Z^2 Y^3 e^{-X^2})\approx `r est`$.

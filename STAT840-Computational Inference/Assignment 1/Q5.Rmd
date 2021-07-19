@@ -1,0 +1,101 @@
+---
+title: "STAT840 A1Q5 Code"
+author: "Branden Lee 20877653 Graduate student"
+date: "14/02/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+#### b
+```{r}
+# Less than bachelor's
+ci1 <- c(qgamma(.025, shape=219, rate=112), 
+         qgamma(.025, shape=219, rate=112, lower.tail=FALSE))
+ci1
+
+# Bachelor's or higher
+ci2 <- c(qgamma(.025, shape=68, rate=45), 
+         qgamma(.025, shape=68, rate=45, lower.tail=FALSE))
+ci2
+
+
+```
+
+
+#### c
+```{r}
+library(ggplot2)
+
+plot_c <- ggplot() +
+  geom_function(fun=dgamma, 
+                aes(col="Less than Bachelor's"), 
+                args=list(shape=219, rate=112)) +
+  geom_function(fun=dgamma, 
+                aes(col="Bachelor's or higher"),
+                args=list(shape=68, rate=45)) +
+  labs(colour='Education Level') +
+  xlim(0,3) + xlab(bquote(theta)) + ylab('Posterior density')
+
+ggsave("plot_5c.png", plot=plot_c)
+```
+
+
+#### d
+```{r}
+# Sample from posterior for those with less than bachelor's
+theta1_sample <- rgamma(1000, shape=219, rate=112)
+
+#Sample from posterior for those with bachelor's or higher
+theta2_sample <- rgamma(1000, shape=68, rate=45)
+
+# Monte Carlo estimate, its variance and confidence interval
+mc_estimate <- mean(theta1_sample > theta2_sample)
+mc_variance <-  (mc_estimate - mc_estimate ^ 2) / 1000
+ci <- mc_estimate + qnorm(.975) * sqrt(mc_variance) * c(-1, 1)
+
+mc_estimate
+mc_variance
+ci
+```
+
+
+#### e
+```{r}
+# Sample from predictive distribution for those with less than bachelor's
+predictive1_sample <- rnbinom(1000, size=219, prob=112/113)
+
+# Sample from predictive distribution for those with bachelor's or higher
+predictive2_sample <- rnbinom(1000, size=68, prob=45/46)
+
+# Monte Carlo estimate, variance and confidence interval
+estimate <- mean(predictive1_sample > predictive2_sample)
+variance <- (estimate - estimate^2) / 1000
+ci <- estimate + qnorm(.975) * sqrt(variance) * c(-1, 1)
+
+estimate
+variance
+ci
+```
+
+
+#### f
+```{r}
+# Plot the predictive distributions
+x <- c(seq(0,10))
+y <- c(sapply(x, dnbinom, 219, 112/113), sapply(x, dnbinom, 68, 45/46))
+c <- c(rep('Xf', 11), rep('Yf', 11))
+
+df <- data.frame(x=rep(x, 2), y=y, c=c)
+plot_f <- ggplot(df, aes(x=x, y=y, fill=c)) + geom_col(position="dodge2") +
+  scale_fill_discrete(name='Education Level', breaks=c('Xf', 'Yf'), 
+                       labels=c('Less than bachelors', 'Bachelors or higher')) +
+  ylab('Predictive mass function')
+ggsave('plot_5f.png', plot=plot_f)
+```

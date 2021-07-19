@@ -1,0 +1,77 @@
+---
+title: "Assignment 2 Q2"
+author: "Branden Lee 20877653"
+date: "21/03/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 2
+
+#### a)
+```{r}
+library(ggplot2)
+set.seed(0)
+
+#Transition matrix
+P <- matrix(rbind(c(0.5, 0.5, 0, 0, 0, 0), 
+            c(0.25, 0.5, 0.25, 0, 0, 0), 
+            c(0.25, 0.25, 0.25, 0.25, 0, 0),
+            c(0, 0 , 0.25, 0.25, 0.25, 0.25),
+            c(0, 0, 0, 0.25, 0.5, 0.25),
+            c(0, 0, 0, 0, 0.5, 0.5)), nrow= 6)
+
+# Simulates a Markov chain of length len with the transition matrix speicfied above
+simulate_mc <- function(len) {
+  sample <- c(1)
+  for (num in seq(from=2, to=len)) {
+    sample <- c(sample, sample(6, size=1, prob=P[sample[num-1],]))
+  }
+  sample
+}
+
+sample <- simulate_mc(1000)
+```
+Below is a time series plot of the simulated Markov chain ${X_t:t=1,...1000}$.  
+```{r echo=FALSE}
+plot(x=seq(1000), y=sample, type='l', xlab='t', ylab=expression(X[t]), main='Time Series Plot')
+```
+
+
+#### b)
+```{r}
+relative_frequency <- function(mc) {
+  freq <- matrix(rbind(c(1, 2, 3, 4, 5, 6), rep(0, 6)), nrow=2)
+  for (x in mc) {
+  freq[2, x] <- freq[2, x] + 1
+  }
+  rel_freq <- rbind(freq[1,], freq[2,] / length(mc))
+  rel_freq
+}
+
+```
+Below is the relative frequency of the 1000 steps of the Markov chain generated in part a), as well as the relative frequency of 100000 steps of the same Markov chain. Based on the symmetry of the transition matrix, it seems reasonably likely that $P(X_i=1)=P(X_i=6)$, $P(X_i=2)=P(X_i=5)$ and $P(X_i=3)=P(X_i=4)$. Indeed, the relative frequencies for 10000 steps of the Markov chain seem to support this hypothesis as the distribution seems to be approaching the stationary distribution $$\pi(i)=\begin{cases}
+\frac{1}{6} & i=1, 6\\
+\frac{2}{9} & i=2, 5\\
+\frac{1}{9} & i=3, 4
+\end{cases}$$
+```{r echo=FALSE}
+knitr::kable(
+cbind(seq(6), relative_frequency(sample)[2,], relative_frequency(simulate_mc(100000))[2,]),
+col.names=c('State', '1000 Observations', '10000 Observations'),
+caption="Relative Frequencies"
+)
+```
+
+#### c)
+```{r}
+guess <- c(1/6, 2/9 , 1/9, 1/9, 2/9 , 1/6)
+
+t(P) %*% guess
+```
+The above calculation confirms that the guess in part b is correct.

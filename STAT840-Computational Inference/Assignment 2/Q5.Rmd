@@ -1,0 +1,114 @@
+---
+title: "Assignment 2"
+author: "Branden Lee 20877653"
+date: "21/03/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 5
+
+#### a)
+
+```{r}
+library(ggplot2)
+set.seed(0)
+density <- function(z) z^(-1.5) * exp(-1.5 * z - 2 / z + 2 * sqrt(3) + log(2))
+
+generate_samplea <- function(init, sample_size, alpha, beta) {
+  sample <- c()
+  z <- init
+  num_accepted <- 0
+  while (length(sample) < sample_size) {
+    proposal <- rgamma(1, shape=alpha, rate=beta)
+    r <- density(proposal) * dgamma(z, shape=alpha, rate=beta) / 
+      (density(z) * dgamma(proposal, shape=alpha, rate=beta))
+    if (r > 1 || runif(1) <= r) {
+      z <- proposal
+      num_accepted <- num_accepted + 1
+    }
+    sample <- c(sample, z)
+  }
+  return(list(sample, num_accepted/length(sample)))
+}
+
+output1 <- generate_samplea(4, 6000, 5.7, 4.7)
+sample1 <- output1[[1]][5001:6000]
+est1 <- mean(sample1)
+est2 <- mean(1 / sample1)
+acceptance_rate1 <- output1[[2]]
+```
+The parameters for the gamma proposal were chosen so that the the density of the proposal has a similar shape to the density of the target distribution (see plot below comparing the gamma proposal with the unnormalized target density). The resulting acceptance rate (`r round(acceptance_rate1, 5)`) confirms our choice of parameters for the proposal lead to a high acceptance rate. We can see based on the time series plot that the chain seems to converge quite quickly (within 1000 or so steps) and the shape empirical density looks similar to that of the target density. Note the first 5000 steps of the chain were discarded and the next 1000 were used for the sample. The resulting estimates of $E(Z), E(\frac{1}{Z})$ can be found in the table directly below which are quite accurate.
+
+```{r echo=FALSE}
+knitr::kable(
+cbind(c('$E(Z)$', '$E(\\frac{1}{Z})$'),
+      c(round(sqrt(2/1.5), 5), round(sqrt(1.5/2) + 1 / 4, 5)),
+      c(round(est1, 5), round(est2, 5))),
+col.names=c('Parameter', 'True Value', 'Estimate'),
+caption="MCMC Estimates"
+  )
+
+ggplot() + xlim(0,5) + geom_function(fun=density, aes(colour='Inverse Gamma')) +
+  geom_function(fun=dgamma, args=list(5.7,4.7), aes(colour='Gamma(5.7,4.7)')) +
+  labs(colour='Distribution', title='Comparing Target and Proposal Densities')
+
+plot(x=seq(length(output1[[1]])), y=output1[[1]], type='l', xlab='t', 
+     ylab=expression(Z[t]), main=bquote('Time Series Plot of ' ~ Z[t] ~ ', Independent MH'))
+
+hist(sample1, freq=FALSE, main=bquote('Empirical Density'~Z[t]~ ', Independent MH'),
+     xlab=expression(Z[t]))
+```
+
+\newpage
+
+#### b)
+```{r}
+density_w <- function(w) {
+  exp(-.5 * w - 1.5 * exp(w) - 2 * exp(-w) + 2 * sqrt(3) + log(2))
+}
+
+generate_sampleb <- function(init, sample_size, std_dev) {
+  sample = c()
+  z <- init
+  num_accepted <- 0
+  while (length(sample) < sample_size) {
+    proposal <- z + rnorm(1, sd=std_dev)
+    r <- density_w(proposal) / density_w(z)
+    if (r > 1 || runif(1) <= r) {
+      z <- proposal
+      num_accepted <- num_accepted + 1
+    }
+    sample <- c(sample, z)
+  }
+  return(list(exp(sample), num_accepted / length(sample)))
+}
+
+output2 <- generate_sampleb(2, 6000, .8)
+sample2 <- output2[[1]][5001:6000]
+acceptance_rate2 <- output2[[2]]
+est3 <- mean(sample2)
+est4 <- mean(1/sample2)
+```
+Note if $W=g(Z)=logZ$, using a change of variables:  
+$\begin{aligned} f_W(w) &= f_Z(g^{-1}(w))\left|\frac{dg^{-1}}{dw}\right|\\ &\propto exp(-1.5w-1.5e^w-2e^{-w}+2\sqrt3+log(2))e^w\\ &= exp(-.5w-1.5e^w-2e^{-w}+2\sqrt3+log(2))\end{aligned}$  
+The standard deviation $\sigma$ of the Gaussian proposal was used as a tuning parameter, with $\sigma=.8$ resulting in a reasonably precise estimates and an acceptance rate of `r round(acceptance_rate2, 5)`: both higher and lower acceptance rates can be achieved with a trade off in precision in estimates, suggesting this choice of standard deviation is close to optimal. Similar to part a, we can see based on the time series plot that the chain seems to converge quite quickly (seemingly within 1000 or so steps) Note the first 5000 steps of the chain were discarded and the next 1000 were used for the sample. The resulting estimates of $E(Z), E(\frac{1}{Z})$ can be found in the table directly below.
+```{r echo=FALSE}
+knitr::kable(
+cbind(c('$E(Z)$', '$E(\\frac{1}{Z})$'),
+      c(round(sqrt(2/1.5), 5), round(sqrt(1.5/2) + 1 / 4, 5)),
+      c(round(est3, 5), round(est4, 5))),
+col.names=c('Parameter', 'True Value', 'Estimate'),
+caption="MCMC Estimates"
+  )
+
+plot(x=seq(length(output2[[1]])), y=output2[[1]], type='l', xlab='t', 
+     ylab=expression(Z[t]), main=bquote('Time Series Plot of ' ~ Z[t] ~ ', Random Walk MH'))
+hist(sample2, freq=FALSE, main=bquote('Empirical Density'~Z[t]~ ', Random Walk MH'), 
+     xlab=expression(Z[t]))
+```

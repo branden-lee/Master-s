@@ -1,0 +1,51 @@
+---
+title: "STAT840 Final Exam"
+author: "Branden Lee"
+date: "4/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 6
+
+#### a)
+```{r}
+data <- c(186,181,176,149,184,190,158,139,175,148,152,11,41,153,190,157,131,149,
+          135,132)
+
+t0 <- (mean(data) - 165) / (sd(data) / sqrt(length(data)))
+p_val <- pt(abs(t0), df=length(data) - 1, lower.tail=FALSE)
+```
+Note for the normal distribution the median $\theta$ is equal to the mean $\mu$ being a symmetric distribution. Then under $H_0$,
+$$t_0=\frac{\overline X - \mu}{s/\sqrt{n}}\sim t_{n-1}$$
+$p=P(t\ge |t_o|)=`r p_val`$. Hence at the 95% significance level we reject the null hypothesis, that is there is significant evidence that $\theta\ne 165$.
+
+#### b)
+```{r}
+library(binaryLogic)
+
+permutation_test <- function() {
+  new_data <- data - 165
+  T_obs <- mean(new_data)
+  count <- 0
+  for (b in 0:(2^20-1)) {
+    bin <- as.binary(b)
+    pi_b <- sapply(c(rep(0, 20-length(bin)), bin), function(x) 2*x-1)
+    T_b <- mean(abs(new_data) * pi_b)
+
+    if (abs(T_b) > abs(T_obs)) {
+      count <- count + 1
+    }
+
+  }
+
+  count / 2 ^ 20
+}
+permutation_test()
+```
+The permutation test results in a p value that is not significant at the 95% level, so the results of this test are different from that of part a.

@@ -1,0 +1,94 @@
+---
+title: "Assignment 3 Supplement"
+author: "Branden Lee"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(latex2exp)
+library(gridExtra)
+```
+
+### Question 4
+
+#### a)
+```{r echo=FALSE}
+cancerDeaths <- read.csv('Supplement Dataset.csv', header=TRUE)
+
+ggplot(cancerDeaths, aes(x=Cancer, y=Count/Population, color=Sex, shape=Province)) + 
+  geom_point(size=2.5, stroke=1, fill=NA) + scale_shape(solid=FALSE) +
+  ylab('Mortality Rate per 1000')
+
+```
+Generally speaking it seems that Newfoundland and Labrador experiences the highest cancer mortality rates among the three provinces while Alberta has the lowest rates. Both prostate and breast cancer also seem to be associated with sex.
+
+#### b)
+There are no recorded deaths from prostate cancer in females, which makes sense since women do not have prostates. These zeros are thus systematic. There are also no recorded deaths from breast cancer in men from Newfoundland and Labrador, which is due to sampling as other provinces have male deaths recorded from breast cancer.
+
+#### c)
+```{r}
+cancerDeaths <- subset(cancerDeaths, !(Cancer=='Prostate' & Sex=='Female'))
+
+model0 <- glm(Count~Sex*Cancer+Province*Sex+Cancer*Province+offset(log(Population)),
+               family=poisson, data=cancerDeaths)
+
+# Models with two 2-way interactions
+model1a <- glm(Count~Province*Sex+Cancer*Province+offset(log(Population)),
+               family=poisson, data=cancerDeaths)
+model1b <- glm(Count~Cancer*Sex+Cancer*Province+offset(log(Population)),
+               family=poisson, data=cancerDeaths)
+model1c <- glm(Count~Province*Sex+Cancer*Sex+offset(log(Population)),
+               family=poisson, data=cancerDeaths)
+```
+The data suggests using a poisson approximation to the binomial since a) each count can be considered a binomial trial where $n$ is the population count from of a given sex from a given province and b) the rates are very low and populations are very large. Thus the models fitted are log linear models with an offset of the log of the population for a given sex and province. Model selection was performed through a backwards selection. First, the zero counts (female with prostate cancer) were removed from the dataset. Since there are zero counts in the dataset, the saturated model will be overparametrized, so the model selection was started with the model including all three 2 way interaction terms. Deviance tests were performed to determine whether any of the models with just 2 of the 2-way interaction terms are adequate compared to the homogeneous association model. All $p$-values (found below) for these tests are statistically significant at the 95% level, so we reject the null hypotheses i.e. the model with all 3 interaction terms is preferred to the others. A residual plot of this model also shows the residuals are reasonable, although not perfect. It seem reasonable to accept this model based on these results.
+
+```{r echo=FALSE}
+pVal <- function(x) {
+  pchisq(x[1], df=x[2], lower.tail=FALSE)
+}
+
+devianceAndDf <- function(x) {
+  summ <- summary(x)
+  c(summ$deviance, summ$df.residual)
+}
+
+models1 <- list(model1a, model1b, model1c)
+
+test1 <- sapply(models1, FUN=devianceAndDf) - devianceAndDf(model0)
+
+knitr::kable(
+  cbind(
+    c('Province/Sex and Cancer/Province interaction model',
+      'Cancer/Sex and Cancer/Province interaction model',
+      'Province/Sex and Cancer/Sex interaction model'
+      ),
+    round(t(test1), digits=5),
+    round(apply(test1, MARGIN=2, pVal), digits=5)
+  ),
+  col.names=c('Model', '$\\Delta D$', 'df', '$p_{val}$'),
+  caption="Deviance tests and $p$-values rounded to 5 decimals"
+  )
+
+
+plotResiduals <- function(model, title) {
+  fv <- model$fitted.values
+  rd <- residuals.glm(model, 'deviance')
+
+  ggplot(data.frame(fitted=fv,resid=rd), aes(x=fitted, y=resid)) +
+  geom_point() + ylab('Deviance Residuals') + xlab(TeX('Fitted Values')) +
+  geom_hline(yintercept=c(1.96,-1.96), linetype='dashed') +
+  ggtitle(title)
+}
+plotResiduals(model0, 'Residuals vs fitted values for final model')
+
+
+```
+
+#### d)
+The analysis above provided evidence that the cancer rates differ according to geography and sex.  In particular, the province and sex interaction term in the model from part c can be interpreted to mean that the difference in cancer rates associated to province and sex is the same across the different types of cancer. Looking at these factors separately, contribution from geography and sex to cancer rates is also affected by the type of cancer, although the difference is the same across different types of sex and geography respectively.

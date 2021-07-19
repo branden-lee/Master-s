@@ -1,0 +1,73 @@
+---
+title: "STAT840 A1Q6"
+author: "Branden Lee 20877653 Graduate Student"
+date: "14/02/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 6
+```{r}
+set.seed(0)
+
+ci95 <- function(mean, variance) mean + qnorm(.975) * sqrt(variance) * c(-1, 1)
+```
+
+#### a)
+```{r}
+g <- function(x) 1 - abs(x) / 5
+
+sample <- as.data.frame(matrix(runif(500 * 50, -10, 10), ncol=500))
+
+f_x <- apply(sample, MARGIN=c(1,2), FUN=function(x) 20 * exp(-x^2/2))
+theta_mc <- apply(f_x, MARGIN=1, mean)
+variance_mc <- (apply(f_x^2, MARGIN=1, FUN=mean) - theta_mc^2) / 500
+
+g_x <- apply(sample, MARGIN=c(1,2), FUN=g)
+theta_control <- apply(g_x, MARGIN=1, mean)
+variance_control <- (apply(g_x^2, MARGIN=1, FUN=mean) - theta_control^2) / 500
+
+covariance <- apply((f_x - theta_mc) * (g_x - theta_control),
+                      MARGIN=1, FUN=function(x) mean(x) / (length(x)-1))
+
+alpha <- - covariance / variance_control
+
+theta_average1 <- mean(theta_mc + alpha * theta_control)
+
+variance_cv <- variance_mc + alpha^2 * variance_control + 2*alpha*covariance
+
+var_average2 <- mean(variance_cv)
+
+```
+As can be seen in the plot of $f(x)=e^{-\frac{x^2}{2}}$ below, for $|x|>3$, $f(x)\approx 0$, so $\int_{-\infty}^\infty e^{\frac{-x^2}{2}}\approx \int_{-10}^{10} e^{\frac{-x^2}{2}}$. Then sampling from $U\sim Unif(-10, 10)$, $\theta\approx E (20e^{\frac{-x^2}{2}})$ where the expectation is taken with respect to the distribution of $U$. The average estimate of $\theta$ is $\widehat{\theta}_1$=`r theta_average1` with an average variance of `r var_average2`.
+
+```{r echo=FALSE}
+library(ggplot2)
+ggplot() + geom_function(fun=function(x) exp(-x^2)) +xlim(-10, 10)
+```
+
+#### b)
+```{r}
+h <- function(x) 1 - x^2 / 25
+
+h_x <- apply(sample, MARGIN=c(1,2), h)
+
+theta_control2 <- apply(h_x, MARGIN=1, mean)
+variance_control2 <- (apply(h_x^2, MARGIN=1, FUN=mean) - theta_control2^2) / 500
+covariance2 <- apply((f_x - theta_mc) * (h_x - theta_control2), MARGIN=1,
+                     FUN=function(x) mean(x) / (length(x)-1))
+
+alpha2 <- - covariance2 / variance_control2
+
+theta_average2 <- mean(theta_mc + alpha2 * (theta_control2 + 1 / 3))
+
+variance_cv2 <- variance_mc + alpha^2 * variance_control2 + 2*alpha*covariance2
+
+var_average2 <- mean(variance_cv2)
+```
+Since $h(x)$ is quadratic in $x$, for $|x|>5$, $h(x)<g(x)$, meaning the correction from $h(x)$ for such observations using the control variate method will be much larger in absolute value than using $g(x)$ as the control variate, and thus contribute to a larger variance. This is supported quantitatively by noting that the average variance using the same sample sizes and number of simulations with $h(x)$ as a control variate is `r var_average2` with a corresponding average estimate of $\widehat{\theta}_2$=`r theta_average2`.

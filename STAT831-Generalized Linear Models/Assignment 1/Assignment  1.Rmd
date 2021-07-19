@@ -1,0 +1,218 @@
+---
+title: "STAT831: Assignment 1"
+author: "Branden Lee 20877653"
+header-includes: \usepackage{amsmath}
+geometry: margin=2cm
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1
+
+```{r, tidy=TRUE}
+beta <- c(100.812, 0.332, 0.411, -3.003, -0.362, -0.521)
+se_beta <- c(13.096, 0.062, 0.090, 1.758, 2.732, 0.262)
+p_val <- format(pt(beta / se_beta, 568, lower.tail=FALSE), scientific=TRUE) 
+row_names <- c("Constant", "Age (in years)", "Waist circumference (cm)", 
+               paste0("Alcohol ", "(yes: 1;no: 0)"), "Smoking (yes: 1;no: 0)", "Ambient temperature $(^{\\circ} C)$")
+col_names <- c("$\\hat{\\beta_i}$", "$se(\\hat{\\beta_i})$", "$p_{val}$")
+data <- matrix(c(beta, se_beta, p_val), ncol = 3)
+df <- data.frame(data, row.names=row_names)
+colnames(df) <- col_names
+```
+
+(a) Under the null hypothesis $H_0: \beta_0 = 0$, the p value is
+\begin{align*}
+p & = P(t_{574-5-1} > \tfrac{\hat{\beta_i}}{se(\hat{\beta_i)}}) \\
+& = P(t_{568} > \tfrac{`r beta[1]`}{`r se_beta[1]`}) \\
+& = `r p_val[1]`
+\end{align*}
+So we reject the null hypothesis. Similar to $\beta_0$, we reject the null hypotheses at the 95% confidence level corresponding to $\beta_1$ and $\beta_2$ for these respectively i.e. there is strong evidence that there is a relationship between age and systolic blood pressure as well as a relationship between waist circumference and systolic blood pressure (table below). However, since the p values for $\beta_3, \beta_4, \beta_5$ are larger than .05, we do not reject their respective null hypotheses at the 95% confidence level.
+```{r echo=FALSE}
+knitr::kable(df, escape=FALSE, scientific=TRUE)
+```
+
+(b) After adjusting for age, waist circumference, alcohol consumption and smoking habits, systolic blood pressure decreases by .521mm Hg for every degree Celsius increase in the temperature. 
+
+(c)
+```{r, tidy=TRUE}
+x_0 <- c(1, 30, 100, 1, 0)
+intercept_c <- sum(x_0 * beta[1:5])
+eq_c = function(x){intercept_c + beta[6] * x}
+curve(eq_c, 15, 50, type = 'l', lty = 2, xlab = bquote('Ambient temperature (' *degree ~ 'C)'),
+       ylab = 'Systolic blood pressure (mm Hg)', 
+      main=paste0("Ambient " , "temperature vs Systolic Blood Pressure"), las=1)
+```
+
+The relationship between ambient temperature and systolic blood pressure for 30 year old men who do not smoke, drink alcohol and have a waist circumference of 100 cm is modeled by the equation:
+$$ Y = `r intercept_c``r beta[6]`x_5 $$
+(d)
+```{r}
+lower <- beta[6] - qt(.975, 568) * se_beta[6]
+upper <- beta[6] + qt(.975, 568) * se_beta[6]
+```
+A 95% confidence interval for the regression parameter for ambient temperature is given by the range of values between     $\hat{\beta_6} \pm  t_{568}(.975) se(\hat{\beta_6})$. The confidence interval is thus $(`r lower`, `r upper`)$.
+
+(e)
+```{r}
+intercept_e <- sum(c(1, 45, 100, 1, 0) * beta[1:5])
+eq_e <- function(x){intercept_e + beta[6] * x}
+print(intercept_e)
+```
+The predicted mean systolic blood pressure for 45 year Ghanian men, don't smoke, drink alcohol and have a waist circumference
+of 100 cm when the ambient temperature is $30^{\circ} C$ is
+\begin{align*}
+\widehat{E(Y|X = x_o)} & = `r intercept_e` - `r abs(beta[6])`x \\
+& = `r intercept_e` - `r abs(beta[6])`\cdot 30 \\
+& = `r eq_e(30)`
+\end{align*}
+
+\newpage
+### Question 2
+
+(a) $L(\lambda;x) = \prod_{i=1}^n f(y;\lambda) = \prod_{i=1}^n \lambda e^{-\lambda x_i} = \lambda^n exp(-\lambda \sum_{i=1}^n x_i)$
+
+    $\ell(\lambda;x) = log(\lambda^n exp(-\lambda \sum_{i=1}^n x_i)) = nlog\lambda - \lambda\sum_{i=1}^n x_i$
+
+(b) $S(\lambda) = \frac{\partial \ell}{\partial \lambda} = \frac{n}{\lambda} - \sum_{i=1}^n x_i$
+
+    $I(\lambda) = -\frac{\partial S}{\partial \lambda} = -(-\frac{n}{\lambda^2}) = \frac{n}{\lambda^2}$
+
+    Note $I(\lambda) = \frac{n}{\lambda^2} > 0$, and $S(\hat{\lambda}) = 0$ when $\hat{\lambda} = \frac{n}{\sum_{i=1}^nx_i}$.
+    Thus $\hat{\lambda}$ is the MLE of $\lambda$.
+
+(c) Under the null hypothesis $H_0: \lambda = 1$:
+\begin{align*}
+    LR: -2r(1)  & = -2(\ell(1) - \ell(\hat{\lambda}))  \\
+    & = -2((nlog(1) - 1\sum_{i=1}^n x_i) - (n log(\frac{n}{\sum_{i=1}^n x_i}) - \frac{n}{\sum_{i=1}^n x_i} \sum_{i=1}^n x_i)) \\
+    & = 2(\frac{n}{\hat{\lambda}} + n log(\hat{\lambda}) - n) \\
+    Score: S(1)^2 / I(1) & = (\frac{n}{1} - \sum_{i=1}^n x_i)^2 / \frac{n}{1} \\
+    & = n(1 - \frac{1}{\hat{\lambda}})^2 \\
+    Wald: (\hat{\lambda} - 1)^2 I(\hat{\lambda}) & = (\hat{\lambda} - 1)^2 \frac{n}{\hat{\lambda^2}} \\
+    & = n(1 - \frac{1}{\hat{\lambda}})^2
+\end{align*}
+  
+(d) As can be seen in the plots, the 3 statistics look virtually identical near the MLE, and produce similar confidence intervals for a given sample size: for this particular distribution, the Score and Wald statistics are the same (this was shown analytically in part b). The dotted horizontal line represents the quantile for the chi-squared distribution with one degree of freedom that would be used for hypothesis testing at the 95% confidence level/calculating 95% confidence interval. The plots highlight the fact that larger sample size allow for more precise inference through smaller confidence intervals/larger rejection regions for hypothesis testing since the interval over which the graphs lies under this quantile becomes small and smaller as n becomes larger.
+
+(Wanted to mention that the y axis of the graphs says $T(\lambda)$ but it should say $T(\hat{\lambda)}$. For some reason the hat doesn't appear but you can see in the source code that in theory the hat should appear, I just couldn't figure out how to make it work)
+```{r, tidy=TRUE}
+lr <- function(lmbd){2 * (num / lmbd + num * log(lmbd) - num)}
+score <- function(lmbd){num * (1 - 1 / lmbd)^2}
+wald <- function(lmbd){num * (1 - 1 / lmbd)^2}
+for (num in c(10, 25, 100)) {
+title <- bquote("Likelihood based statistics for Exp(" ~ lambda ~ "), " ~ "n ="~ .(num))
+curve(lr, 0.4, 2.1, main = title, type = 'l', lty = 1, col = 'grey', las=1,
+      xlab = bquote(widehat(lambda)), ylab = expression(paste("T(", widehat(lambda), ")")), 
+      xlim=c(0.5,2), ylim=c(0,50),)
+curve(score, 0.4, 2.1, type = 'l', lty = 1, col = 'red', add=TRUE)
+curve(wald, 0.4, 2.1, type = 'l', lty = 2, col = 'blue', add=TRUE)
+abline(h = qchisq(0.95, 1), lty = 2)
+legend('topright', legend = c("LR", 'Score', 'Wald', expression(paste(chi[1]^2, "(0.95)"))),
+       col = c('grey', 'red', 'blue', 'black'), lty=c(1,1,2,2), bty='n')
+}
+```
+
+\newpage
+### Question 3
+(a) $f(y; \mu , \lambda) = \sqrt{\frac{\lambda}{2 \pi y^3}} exp{\frac{-\lambda(y - \mu)^2}{2 y \mu^2}}
+= exp \left( \frac{\frac{1}{\mu^2}y-\frac{2}{\mu}}{-\frac{2}{\lambda}} - \frac{\lambda}{2y} + \frac{1}{2} log \frac{\lambda}{2 \pi y^3} \right)$
+
+Taking $\theta = \frac{1}{\mu^2}, \;\: \phi = \frac{1}{\lambda}, \;\: a(\phi) = -2\phi, \;\: b(\theta) = 2\sqrt{\theta}, \;\: c(y; \phi) = - \frac{\lambda}{2y} + \frac{1}{2} log \frac{\lambda}{2 \pi y^3}$, we see that $Y$ is a member of the exponential family.
+
+(b) $E(Y) = b'(\theta) = \theta^{-\frac{1}{2}} = \mu$  
+$Var(Y) = a(\phi)b''(\theta) = -2 \phi (-\frac{1}{2}\theta^{-\frac{3}{2}}) = \frac{\mu^3}{\lambda}$  
+$V(\mu) = b''(\theta) = -\frac{1}{2} \theta^{-\frac{3}{2}} = -\frac{1}{2}\mu^3$
+
+
+(c) $\theta = \frac{1}{\mu^2} = \eta \implies g(\mu) = \frac{1}{\mu^2}$ is the canonical link function.
+
+(d)
+```{r, tidy=TRUE}
+dinvgauss <- function(y, mu, lambda)
+  {(lambda / (2 * pi * y^3)) ^ 0.5 * exp(-lambda * (y - mu) ^ 2 / (2 * y * mu ^2))}
+density1 <- function(y){dinvgauss(y, 10, 5)}
+curve(density1, 0, 40, xlim=c(0,40), ylim=c(0,0.17),type='l', lty=1, las = 1,
+      main=expression(paste('Density of Inverse Gaussian for various ', mu, ', ', lambda)), 
+      col = 'grey', xlab='y', ylab=expression(paste('f(y; ', mu, ', ',lambda, ')')))
+density2 <- function(y){dinvgauss(y, 10, 10)}
+curve(density2, 0, 40, type='l', col='blue', lty=2, add=TRUE)
+density3 <- function(y){dinvgauss(y, 10, 20)}
+curve(density3, 0, 40, type='l', col='black', lty=3, add=TRUE)
+density4 <- function(y){dinvgauss(y, 20, 10)}
+curve(density4, 0, 40, type='l', col='red', lty=4, add=TRUE)
+legend("topright", legend=c(expression(paste(mu, '=10   ', lambda, '=5')),
+                            expression(paste(mu, '=10   ', lambda,'=10')), 
+                            expression(paste(mu, '=10   ', lambda, '=20')), 
+                            expression(paste(mu, '=20   ', lambda, '=10'))), 
+       col=c('grey', 'blue', 'black', 'red'), lty=c(1,2,3,4), bty='n')
+```
+
+The inverse Gaussian distribution would be appropriate for data that is continuous and
+strictly non-negative.
+
+\newpage
+### Question 4
+
+(a) Under the log link $\eta = g(\mu)=log(\mu)$,
+$$\frac{\partial \eta_i}{\partial\mu_i} = \frac{1}{\mu_i} = e^{-x_i^t\beta}, \quad W_i^{-1} = Var(y_i) \left( \frac{\partial \eta_i}{\partial\mu_i} \right)^2
+  = \frac{\mu_i^3}{\lambda} \left( \frac{1}{\mu_i} \right)^2
+  = \frac{\mu_i}{\lambda}
+  = \frac{e^{x_i^t\beta}}{\lambda}$$
+\begin{align*}
+  \implies S(\beta)_j & = \sum_{i=1}^n (y_i - \mu_i) W_i \frac{\partial \eta_i}{\partial \mu_i} x_{ij} \\
+  & = \sum_{i=1}^n (y_ - e^{x_i^t\beta}) \frac{\lambda}{e^{x_i^t\beta}} \frac{1}{e^{x_i^t\beta}} x_{ij} \\
+  & = \sum_{i=1}^n (y_ - e^{x_i^t\beta}) \lambda e^{-2x_i^t\beta} x_{ij} \\
+  \mathcal{I}(\beta)_{jk} & = \sum_{i=1}^n x_{ij} W_i x_{ik} \\
+  & = \lambda \sum_{i=1}^n x_{ij} e^{-x_i^t\beta} x_{ik}
+\end{align*}
+
+(b)
+```{r, tidy=TRUE}
+lambda = 140000
+y <- c(92.00, 92.00, 91.25, 85.62, 84.90, 87.88, 87.88, 87.57, 90.25, 88.40, 89.45, 96.38,
+       94.62, 91.23)
+x <- c(42,43,44,46,48,49,50,51,57,59,60,61,62,63)
+Xt <- matrix(c(rep(1, 14), x, x^2), ncol=3)
+
+score <- function(b) {
+  s <- c()
+  for (j in 1:3) {
+    sum <- 0
+    for (i in 1:14) {
+      sum <- sum + exp(-2 * Xt[i,] %*% b) * (y[i] - exp(Xt[i,] %*% b)) * Xt[i,j]
+    }
+    s[j] <- lambda * sum
+  }
+  return(s)
+}
+
+irls <- function(b, eps) {
+  beta_old <- b
+  w <- c()
+  for (i in 1:14) {
+    w[i] <- exp(-Xt[i,] %*% beta_old)
+  }
+  W <- lambda * diag(w)
+  exp_inf <- t(Xt) %*% W %*% Xt
+  beta_new <- beta_old + solve(exp_inf) %*% score(beta_old)
+  while ((sum(beta_old - beta_new)^2)^0.5 >= eps) {
+    beta_old <- beta_new
+    beta_new <- beta_old + solve(exp_inf) %*% score(beta_old)
+    
+  }
+  return(beta_new)
+}
+
+print(irls(c(5, -.05, .0005), .0001))
+```
+
+Using $\beta_0 = (5, -.05, .0005)$ with an error of less than .0001 using the euclidean norm, we get $\hat{\beta} = (`r irls(c(5, -.05, .0005), .0001)`)$.
+
+
+

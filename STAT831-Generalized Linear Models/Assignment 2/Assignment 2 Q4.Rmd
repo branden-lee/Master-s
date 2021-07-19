@@ -1,0 +1,75 @@
+---
+title: "Assignment 2 Q4"
+author: "Branden Lee 20877653"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Question 4
+
+##### a) 
+```{r}
+crabs = read.csv('crabs.csv', header = T)
+crabs$MalesBin <- ifelse(crabs$Males == 'yes', 1, 0)
+model1 <- glm(MalesBin ~ Width, family = binomial, data = crabs)
+summary(model1)
+```
+$\beta_0$: The baseline log odds (i.e. width = 0cm) of a female horseshoe crab with at least one satellite male present is `r model1$coefficients[1]`. This interpretation is only theoretical as clearly a width of 0 is nonsensical.  
+$\beta_1$: The log odds of a female horseshoe crab with at least one satellite male present increases by `r model1$coefficients[2]` per centimeter increase in the female's width.
+
+
+##### b)
+```{r warning=FALSE}
+x <- c(1, mean(crabs$Width))
+
+logOr <- x %*% model1$coefficients
+prob <- 1 / (1 + exp(-logOr))
+var <- t(x) %*% summary(model1)$cov.unscaled %*% x
+
+betaCI <- logOr + c(-1,1) * qnorm(.975) * sqrt(var)
+probCI <-  1 / (1 + exp(-betaCI))
+```
+The estimated probability that an average width female will have at least one staellite male is $\hat{\pi}(\bar{x}) = \frac{1}{1+e^{-(\hat{\beta}_0+\hat{\beta}_1\bar{x})}} = `r prob`$.
+A 95% confidence interval for this estimate is $(`r probCI[1]`, `r probCI[2]`)$.
+
+
+##### c)
+```{r}
+crabs$ColorF <- factor(crabs$Color, levels=c(0,1,2,3),
+                       label=c('light medium', 'medium','dark medium', 'dark'))
+model2 <- glm(MalesBin ~ Width + ColorF, family=binomial, data=crabs)
+deviance <- summary(model1)$deviance - summary(model2)$deviance
+```
+$\beta_1$: The log odds of a female horeshoe crab with at least one satellite male present increases by `r model2$coefficients[2]` per centimeter increase in width for female crabs of the same color.  
+Let $\beta_2,\beta_3,\beta_4$ be the regression coefficients corresponding to the colors medium, dark medium and dark respectively. The model of interest is 
+$$log\frac{\pi}{1-\pi}=\beta_0+\beta_1x_1+\beta_2x_2+\beta_3x_3+\beta_4x_4$$
+and the hypothesis test of interest is
+$$H_0: \beta_2=\beta_3=\beta_4=0$$
+$$H_a: \beta_2 \neq 0 \text{ or } \beta_3 \neq 0 \text{ or } \beta_4 \neq 0$$
+Under the null hypothesis, $\Delta D \sim \chi^2_3$.
+$$\Delta D = D_0 - D_a = `r summary(model1)$deviance` - `r summary(model2)$deviance` = `r deviance`$$
+Since $P(\chi^2_3 > \Delta D)$ = `r pchisq(deviance, df=3, lower.tail=FALSE)`, we do not reject the null hypothesis at the 95% level.
+
+
+##### d)
+```{r}
+model3 <- glm(MalesBin ~ Width + Color, family=binomial, data=crabs)
+deviance2 <- summary(model1)$deviance - summary(model3)$deviance
+```
+$\beta_1$: The log odds of a female horseshoe crab with at least one satellite male present increases by `r model3$coefficients[2]` per centimeter increase in width for female crabs of the same colour when colour is treated as a gradient.  
+Let $\beta_2$ be the regression coefficient corresponding to color. The model of interest is 
+$$log\frac{\pi}{1-\pi}=\beta_0+\beta_1x_1+\beta_2x_2$$
+The hypothesis test of interest is
+$$H_0: \beta_2=0$$
+$$H_a: \beta_2 \neq 0$$
+Under the null hypothesis, $\Delta D \sim \chi^2_1$.
+$$\Delta D = D_0 - D_a = `r summary(model1)$deviance` - `r summary(model3)$deviance` = `r deviance2`$$
+Since $P(\chi^2_1 > \Delta D)$ = `r pchisq(deviance2, df=1, lower.tail=FALSE)`, we reject the null hypothesis at the 95% level i.e. the data suggests a relationship between the colour of female horseshoe crabs and the presence of satellite males near the female.
+
+##### e)
+I prefer model in part d: the result of the deviance test for the model in part c doesn't provide evidence that any single colour has a relationship with the proximity of satellite males, while the result of the deviance test for the model in part d provides evidence that there is a relationship when color is treated as a gradient i.e. colour in general.

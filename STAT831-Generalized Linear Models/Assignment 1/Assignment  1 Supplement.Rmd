@@ -1,0 +1,43 @@
+---
+title: "STAT831: Assignment 1 Supplement"
+author: "Branden Lee 20877653"
+header-includes: \usepackage{amsmath}
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 5
+
+a.
+The second order Taylor approximation of $\ell(\theta) = \ell(\theta, y)$ about the MLE $\hat{\theta}$ is given by
+\begin{align*}
+\ell(\theta) & \approx \ell(\hat{\theta}) + l'(\hat{\theta})(\theta - \hat{\theta}) + \frac{1}{2} l''(\hat{\theta})(\theta - \hat{\theta})^2 \\
+& = \ell(\hat{\theta}) + S(\hat{\theta})(\theta - \hat{\theta}) - \frac{1}{2} I(\hat{\theta})(\theta - \hat{\theta})^2 \\
+& = \ell(\hat{\theta}) - \frac{1}{2} I(\hat{\theta})(\theta - \hat{\theta})^2   && \text{since $S(\hat\theta) = 0$}
+\end{align*}
+
+b. $\ell(\theta) \approx \ell(\hat{\theta}) - \frac{1}{2} I(\hat{\theta})(\theta - \hat{\theta})^2 \iff \ell(\theta) - \ell(\hat{\theta}) \approx - \frac{1}{2} I(\hat{\theta})(\theta - \hat{\theta})^2 \iff (\hat{\theta} - \theta)^2 I(\hat{\theta}) \approx -2 (\ell(\theta) - \ell(\hat{\theta}))$
+
+Since a Taylor approximation is only valid for $\left| \theta - \hat{\theta} \right|$ small, it follows that the Wald statistic is a good approximation to a likilhood ratio test when $\left| \theta - \hat{\theta} \right|$ is small.
+
+c. As seen below, the plots reaffirm the derivation in part a since for values of $\hat{\lambda}$ near the MLE, the graph of the Wald statistic is an excellent approximation of the LR statistic. As $n$ gets larger, the interval over which the approximation is good becomes smaller.
+```{r, tidy=TRUE}
+n <- c(10, 25, 100)
+
+lr <- function(lmbd){2 * (num / lmbd + num * log(lmbd) - num)}
+wald <- function(lmbd){num * (1 - 1 / lmbd)^2}
+for (num in n) {
+title <- bquote("Likelihood based statistics for Exp(" ~ lambda ~ "), " ~ "n ="~ .(num))
+curve(lr, 0.4, 2.1, main = title, type = 'l', lty = 1, col = 'grey', xlab = expression(widehat(lambda)), ylab = expression(paste("T(", widehat(lambda), ")")), xlim=c(0.5,2), ylim=c(0,50))
+curve(wald, 0.4, 2.1, type = 'l', lty = 2, col = 'blue', add=TRUE)
+legend('topright', legend = c("LR", 'Wald'), col = c('grey', 'blue'), lty=c(1,2), bty='n')
+difference <- function(f_1, f_2, x) {abs(f_1(x) - f2(x))}
+
+}
+```

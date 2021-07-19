@@ -1,0 +1,69 @@
+---
+title: "Assignment 4"
+author: "Branden Lee 20877653"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pscl)
+library(ggplot2)
+```
+
+### Question 3
+
+#### (a)
+\begin{align*}
+E(Y_i) &= \sum_{y_i=0}^\infty y_iP(Y_i=y_i)\\
+&= 0\cdot \left(\pi_i+(1-\pi_i)\frac{\omega^\omega}{(\mu_i+\omega)^{\omega}}\right)+\sum_{y_i=1}^\infty y_i \frac{\Gamma(y_i+\omega)}{y_i!\Gamma(\omega)}\frac{\mu_i^{y_i}\omega^\omega}{(\mu_i+\omega)^{y_i+\omega}} \cdot (1-\pi_i)\\
+&= (1-\pi_i)\sum_{y_i=0}^\infty y_i \frac{\Gamma(y_i+\omega)}{y_i!\Gamma(\omega)}\frac{\mu_i^{y_i}\omega^\omega}{(\mu_i+\omega)^{y_i+\omega}}\\
+&= (1-\pi_i) \mu_i\\
+E(Y_i^2) &= \sum_{y_i=0}^\infty y_i^2P(Y_i=y_i)\\
+&= 0^2\cdot \left(\pi_i+(1-\pi_i)\frac{\omega^\omega}{(\mu_i+\omega)^{\omega}}\right)+\sum_{y_i=1}^\infty y_i^2\frac{\Gamma(y_i+\omega)}{y_i!\Gamma(\omega)}\frac{\mu_i^{y_i}\omega^\omega}{(\mu_i+\omega)^{y_i+\omega}} \cdot (1-\pi_i)\\
+&= (1-\pi_i)E(Y_i^2|Y_i \text{ not necessarily } 0)\\
+&= (1-\pi_i)(Var(Y_i|Y_i \text{ not necessarily } 0)+E(Y_i|Y_i \text{ not necessarily } 0)^2)\\
+&= (1-\pi_i)\left(\omega\cdot\frac{\mu_i}{\omega}\left(1+\frac{\mu_i}{\omega}\right)+\mu_i^2\right)\\
+&= (1-\pi_i)\left(\mu_i\left(1+\frac{\mu_i}{\omega}\right)+\mu_i^2\right)\\
+\implies Var(Y_i)&=(1-\pi_i)\left(\mu_i\left(1+\frac{\mu_i}{\omega}\right)+\mu_i^2\right)-(1-\pi_i)^2\mu_i^2\\
+&= (1-\pi_i)\mu_i\left(1+\frac{\mu_i}{\omega}+\mu_i-(1-\pi_i)\mu_i\right)\\
+&= (1-\pi_i)\mu_i(1+\mu_i(\pi_i+1/\omega))
+\end{align*}
+
+
+#### (b)
+Based on the log-likelihood in 2c), the log-likelihood for the ZINB model for a single observation can be expressed as
+\begin{align*}
+\ell_i(\gamma, \omega) &= I(y_i=0)log(e^{z_i^t\gamma}+P(Y_i=0|Y_i \text{ not necessarily } 0)) +\\ 
+&\qquad I(y_i>0)log(P(Y_i>0|Y_i \text{ not necessarily } 0))-log(1+e^{z_i^t\gamma})\\
+&= I(y_i=0)log\left(e^{z_i^t\gamma}+\frac{\Gamma(0+\omega)}{0!\Gamma(\omega)}\cdot\frac{\mu_i^{0}\omega^\omega}{(\mu_i+\omega)^{0+\omega}}\right) +\\ 
+&\qquad I(y_i>0)log\left(\frac{\Gamma(y_i+\omega)}{y_i!\Gamma(\omega)}\cdot\frac{\mu_i^{y_i}\omega^\omega}{(\mu_i+\omega)^{y_i+\omega}}\right)-log(1+e^{z_i^t\gamma})\\
+&= I(y_i=0)log\left(e^{z_i^t\gamma}+\left(\frac{\omega}{\mu_i+\omega}\right)^\omega\right) +\\ 
+&\qquad I(y_i>0)log\left(\frac{\Gamma(y_i+\omega)}{y_i!\Gamma(\omega)}\cdot\frac{\mu_i^{y_i}\omega^\omega}{(\mu_i+\omega)^{y_i+\omega}}\right)-log(1+e^{z_i^t\gamma})\\
+&= I(y_i=0)log\left(e^{z_i^t\gamma}+\left(\frac{\omega}{\mu_i+\omega}\right)^\omega\right) +\\ 
+&\qquad I(y_i>0)\left[log\frac{\Gamma(y_i+\omega)}{\Gamma(\omega)}+y_i log(\mu_i)+\omega log\omega-(y_i+\omega)log(\mu_i+\omega)-log(y_i!)\right]-log(1+e^{z_i^t\gamma})\\
+&= I(y_i=0)log\left(e^{z_i^t\gamma}+\left(\frac{\omega}{e^{x_i^t\beta}+\omega}\right)^\omega\right) +\\ 
+&\qquad I(y_i>0)\left[log\frac{\Gamma(y_i+\omega)}{\Gamma(\omega)}+y_i x_i^t\beta+\omega log\omega-(y_i+\omega)log(e^{x_i^t\beta}+\omega)-log(y_i!)\right]-log(1+e^{z_i^t\gamma})\\
+\end{align*}
+
+
+#### (c)
+```{r}
+data(bioChemists)
+
+model1 <- zeroinfl(art~fem+mar+kid5+ment|ment, data = bioChemists)
+model2 <- zeroinfl(art~fem+mar+kid5+ment|ment, dist='negbin', data = bioChemists)
+
+df <- data.frame(fv=c(model1$fitted.values, model2$fitted.values),
+                 rd=c(summary(model1)$residuals, summary(model2)$residuals), 
+                 model=c(rep('ZIP' ,length(model1$fitted.values)),
+                         rep('ZINB',length(model2$fitted.values))))
+
+ggplot(df, aes(x=fv, y=rd)) + geom_point(aes(color=model)) + 
+  labs(x='Fitted Values', y='Pearson Residuals') +
+  geom_hline(yintercept=c(-1.96, 1.96), linetype='dashed')
+```
+Although neither residual plots look ideal, it's clear that the ZINB model results in fewer extreme residuals, and the ones that are still extreme are more well behaved. Based on this I prefer the ZINB model.

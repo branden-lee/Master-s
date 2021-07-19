@@ -1,0 +1,59 @@
+---
+title: "STAT840 Final Exam"
+author: "Branden Lee"
+date: "4/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 9
+#### a)
+```{r message=F, warning=F}
+data <- read.delim('zachary.txt', header=FALSE, sep=' ')[,-3]
+library(igraph)
+
+g <- graph.data.frame(data, directed=FALSE)
+plot(g)
+
+diameter <- diameter(g)
+diameter
+```
+
+#### b)
+```{r}
+deg_dist <- degree_distribution(g)
+deg_dist <- rbind(0:(length(deg_dist)-1), deg_dist)
+rownames(deg_dist) <- c('Degree', 'Relative Frequency')
+deg_dist
+```
+
+
+#### c)
+```{r}
+vertex_clustering_coefs <- c()
+for (v in V(g)) {
+  nbhd <- ego(g, nodes=v)[[1]]
+  nbhd_subgraph <- induced_subgraph(g, vids=nbhd)
+  clg <- length(E(nbhd_subgraph)) / (factorial(length(nbhd)) / (2 * factorial(length(nbhd) - 2)))
+  vertex_clustering_coefs <- c(vertex_clustering_coefs, clg)
+}
+vertex_clustering_coefs
+
+graph_clustering_coef <- mean(vertex_clustering_coefs)
+graph_clustering_coef
+```
+
+
+#### d)
+```{r}
+closeness_centrality <- closeness(g)
+betweenness_centrality <- betweenness(g)
+
+closeness_centrality
+betweenness_centrality
+```

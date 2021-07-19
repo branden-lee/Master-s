@@ -1,0 +1,182 @@
+---
+title: "Assignment 4"
+author: "Branden Lee"
+date: '`r Sys.Date()`'
+output:
+  pdf_document: default
+  html_document: default
+header-includes: 
+  - \usepackage{amsmath}
+  - \usepackage{caption}
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# library(survey)
+library(Matching)
+```
+
+### Question 1
+
+```{r}
+# Setup
+set.seed(1)
+
+# Some useful functions
+expit <- function(x) {exp(x) / (1 + exp(x))}
+eta <- function(x1,x2,a) {exp(0.5 + 4*expit(3*x1) + x2 + 0.5*a)}
+bias <- function(x) {sum(x-0.5) / length(x)}
+stddev <- function(x) {sqrt(sum((x-mean(x))^2)/(length(x)-1))}
+mse <- function(x) {sum((x-0.5)^2) / length(x)}
+
+# Number of simulations
+k=1000
+
+# Creating empty vectors to store estimates
+matchingEstimate1 <- rep(NA, k)
+matchingEstimate2 <- rep(NA, k)
+matchingEstimate3 <- rep(NA, k)
+matchingEstimate4 <- rep(NA, k)
+
+ipwEstimate1 <- rep(NA, k)
+ipwEstimate2 <- rep(NA, k)
+ipwEstimate3 <- rep(NA, k)
+ipwEstimate4 <- rep(NA, k)
+
+stratifiedEstimate1 <- rep(NA, k)
+stratifiedEstimate2 <- rep(NA, k)
+stratifiedEstimate3 <- rep(NA, k)
+stratifiedEstimate4 <- rep(NA, k)
+
+# Loop for simulation
+for(i in 1:k) {
+  # Create dataframe and generate covariates
+  df <- data.frame(matrix(rnorm(7500), ncol=3))
+  colnames(df) <- c('x1', 'x2', 'x3')
+
+  
+  # True propensity score
+  df$ps <- expit(df$x1 * 0.5 + df$x3 * 0.75)
+
+  
+  # Treatment assignment
+  df$A <- apply(df[,c('x1','x3')],
+                MARGIN=1,
+                FUN=function(x) rbinom(1, 1, expit(x['x1'] * 0.5 + x['x3'] * 0.75)))
+  
+  
+  # Count outcome
+  df$Y <- apply(df[,c('x1','x2','A')],
+                MARGIN=1,
+                FUN=function(x) rpois(1, lambda=eta(x[1],x[2],x[3])))
+
+  
+  # Fit propensity score models
+  df$ps1 <- predict(glm(A~x1, family=binomial, data=df), type='response')
+  df$ps2 <- predict(glm(A~x1+x3, family=binomial, data=df), type='response')
+  df$ps3 <- predict(glm(A~x1+x2, family=binomial, data=df), type='response')
+  df$ps4 <- predict(glm(A~x1+x2+x3, family=binomial, data=df), type='response')
+  
+  
+  # Matching estimates
+  
+  # Generic function to calculate estimated causal log rate ratio by matching the
+  # provided estimated propensity scores using 1-1 matching with replacement, no
+  # ties and 0.2 calipers.
+  estimateMatching <- function(.ps) {
+    matching <- Match(Y=df$Y, Tr=df$A, X=.ps, M=1, replace=TRUE, ties=FALSE, 
+                      estimand='ATE', caliper=.2)
+    matched <- df[c(matching$index.treated, matching$index.control),]
+    glm(Y~A, family=poisson, data=matched)$coef[2]
+  }
+  matchingEstimate1[i] <- estimateMatching(df$ps1)
+  matchingEstimate2[i] <- estimateMatching(df$ps2)
+  matchingEstimate3[i] <- estimateMatching(df$ps3)
+  matchingEstimate4[i] <- estimateMatching(df$ps4)
+
+  
+  # IPW estimates
+  
+  # Returns adjusted weights (set to 20 if larger then 20) based on given propensity 
+  # score model.
+  adjustedWeights <- function(.ps) {
+    w <- rep(NA, nrow(df))
+    w[df$A==1] <- 1 / .ps[df$A==1]
+    w[df$A==0] <- 1 / (1 - .ps[df$A==0])
+    ifelse(w>20, 20, w)
+  }
+  ipwEstimate1[i] <- glm(Y~A, family=poisson, weights=adjustedWeights(df$ps1), 
+                         data=df)$coef[2]
+  ipwEstimate2[i] <- glm(Y~A, family=poisson, weights=adjustedWeights(df$ps2), 
+                         data=df)$coef[2]
+  ipwEstimate3[i] <- glm(Y~A, family=poisson, weights=adjustedWeights(df$ps3), 
+                         data=df)$coef[2]
+  ipwEstimate4[i] <- glm(Y~A, family=poisson, weights=adjustedWeights(df$ps4), 
+                         data=df)$coef[2]
+
+  
+  # Stratification
+  
+  # Generic function for estimating causal log rate ratio by stratifying on provided
+  # estimated propensity scores.
+  estimateStratified <- function(x) {
+    df$strata <- cut(x, breaks=quantile(df$ps1, probs=(seq(0, 1, 0.2))),
+                 labels=1:5, include.lowest=TRUE)
+    mean(sapply(1:5, 
+                FUN=function(z) glm(Y~A, family=poisson, data=df[df$strata==z,])$coef[2]))
+  }
+  
+  stratifiedEstimate1[i] <- estimateStratified(df$ps1)
+  stratifiedEstimate2[i] <- estimateStratified(df$ps2)
+  stratifiedEstimate3[i] <- estimateStratified(df$ps3)
+  stratifiedEstimate4[i] <- estimateStratified(df$ps4)
+}
+
+```
+
+Based on the simulation, propensity score model 2 ($x_1, x_2$) results in the best estimated causal log rate ratio in terms of both standard deviation and mean squared error, while model 3 ($x_1, x_3$) performs the worst despite being the true propensity score model. This agrees with the fact that it is optimal to choose a propensity score model that includes only the covariates marginally related with the outcome.
+
+\begin{center}
+\captionof{table}{1-1 Matching with Replacement and Calipers}
+\begin{tabular}{|l|c|c|c|}
+\hline
+& Bias & Standard Deviation & Mean Squared Error\\
+\hline
+$PS_1$ & `r bias(matchingEstimate1)` & `r stddev(matchingEstimate1)` & `r mse(matchingEstimate1)`\\
+$PS_2$ & `r bias(matchingEstimate2)` & `r stddev(matchingEstimate2)` & `r mse(matchingEstimate2)`\\
+$PS_3$ & `r bias(matchingEstimate3)` & `r stddev(matchingEstimate3)` & `r mse(matchingEstimate3)`\\
+$PS_4$ & `r bias(matchingEstimate4)` & `r stddev(matchingEstimate4)` & `r mse(matchingEstimate4)`\\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{center}
+\captionof{table}{IPW}
+\begin{tabular}{|l|c|c|c|}
+\hline
+& Bias & Standard Deviation & Mean Squared Error\\
+\hline
+$PS_1$ & `r bias(ipwEstimate1)` & `r stddev(ipwEstimate1)` & `r mse(ipwEstimate1)`\\
+$PS_2$ & `r bias(ipwEstimate2)` & `r stddev(ipwEstimate2)` & `r mse(ipwEstimate2)`\\
+$PS_3$ & `r bias(ipwEstimate3)` & `r stddev(ipwEstimate3)` & `r mse(ipwEstimate3)`\\
+$PS_4$ & `r bias(ipwEstimate4)` & `r stddev(ipwEstimate4)` & `r mse(ipwEstimate4)`\\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{center}
+\captionof{table}{Stratification into Quintiles}
+\begin{tabular}{|l|c|c|c|}
+\hline
+& Bias & Standard Deviation & Mean Squared Error\\
+\hline
+$PS_1$ & `r bias(stratifiedEstimate1)` & `r stddev(stratifiedEstimate1)` & `r mse(stratifiedEstimate1)`\\
+$PS_2$ & `r bias(stratifiedEstimate2)` & `r stddev(stratifiedEstimate2)` & `r mse(stratifiedEstimate2)`\\
+$PS_3$ & `r bias(stratifiedEstimate3)` & `r stddev(stratifiedEstimate3)` & `r mse(stratifiedEstimate3)`\\
+$PS_4$ & `r bias(stratifiedEstimate4)` & `r stddev(stratifiedEstimate4)` & `r mse(stratifiedEstimate4)`\\
+\hline
+\end
+{tabular}
+\end{center}
+

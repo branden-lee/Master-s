@@ -1,0 +1,32 @@
+---
+title: "STAT931 Assignment 2"
+author: "Branden Lee 20877653"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Question 2
+
+##### a)
+$$\hat{\beta}_c=log\frac{n_{10}}{n_{01}} = log\frac{7+4+7}{3+2+0} = log\frac{18}{5} \implies \widehat{OR} = \frac{18}{5} = `r 18/5`$$
+
+The odds of a patient having had at least one spontaneous abortion given they have coronary heart disease is 3.6 times the odds of the patient having had at least one spontaneous abortion given they don't have coronary heart disease.
+
+##### b)
+A 95% confidence interval for the odds ratio is $\frac{n_{10}}{n_{01}} exp\left(\pm Z_{.975} \sqrt{\frac{1}{n_{10}} + \frac{1}{n_{01}}}\right)$, where $Z_{.975}$ is the 97.5th percentile of the standard normal distribution:
+$$\frac{18}{5} exp \left(\pm 1.96 \sqrt{\frac{1}{18} + \frac{1}{5}} \right) = (`r (18 / 5) * exp(- qnorm(.975) * sqrt(1/18 + 1/5))`, `r 18 / 5 * exp(qnorm(.975) * sqrt(1/18 + 1/5))`)
+$$
+We can say with 95% confidence the odds of women with coronary heart disease having  had a spontaneous abortion are somewhere between roughly 1.34 to 9.7 times more likely than those that don't suffer from coronary heart disease.
+
+##### c)
+$H_0: \beta = 0, H_a: \beta \neq 0$  
+$S_c(0) = \frac{n_{10} - n_{01}}{2}$  
+$I_c(0) = \frac{n_{10} + n_{01}}{4}$  
+$\implies T = \frac{S_c(0)^2}{I_c(0)} = \frac{(n_{10} - n_{01})^2}{n_{10} + n_{01}} = \frac{(18-5)^2}{18+5} = `r 13^2 / 23`$  
+Under $H_0$, $T \sim \chi^2_1$. Since $T > `r qchisq(.95, df=1)` = \chi^2_1(.95)$, we reject the null hypothesis. That is, there is evidence of a relationship between spontaneous abortions and coronary heart disease.

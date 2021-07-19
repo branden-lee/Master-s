@@ -1,0 +1,59 @@
+---
+title: "STAT831 Assignment 2"
+author: "Branden Lee 20877653"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 2
+##### a)
+```{r}
+library(GLMsData)
+data(germ)
+
+germ$resp <- cbind(germ$Germ, germ$Total - germ$Germ)
+binomialModel1 <- glm(resp ~ Seeds * Extract, family = binomial, data = germ)
+
+beta <- exp(binomialModel1$coefficients)
+```
+The odds of OA73 bean seeds germinating is `r beta[1]`.  
+The odds of OA75 bean seeds germinating versus the odds of OA73 bean seeds germinating is  `r beta[2]`.  
+The odds of OA73 cucumber seeds germinating versus the odds of OA73 bean seeds is `r beta[3]`.  
+The estimate $e^{\hat{\beta}_3} = `r beta[4]`$ suggests that the germination of cucumber seeds may depend on the type of seed.
+
+
+##### b)
+```{r}
+data(germBin)
+
+germBin$ResultF <- factor(germBin$Result, levels = c('NotGerm', 'Germ'))
+binaryModel1 <- glm(ResultF ~ Seeds * Extract, family=binomial, data=germBin)
+
+summary(binomialModel1)
+summary(binaryModel1)
+```
+It's clear from the summaries that the estimates for the coefficients agree and the deviances differ.
+
+##### c)
+```{r}
+binomialModel2 <- glm(resp ~ Seeds + Extract, family = binomial, data = germ)
+binomialDeviance <- binomialModel2$deviance - binomialModel1$deviance
+binomialDevianceDf <- binomialModel2$df.residual - binomialModel1$df.residual
+
+binaryModel2 <- glm(ResultF ~ Seeds + Extract, family=binomial, data=germBin)
+binaryDeviance <- binaryModel2$deviance - binaryModel1$deviance
+binaryDevianceDf <- binaryModel2$df.residual - binaryModel1$df.residual
+```
+The hypothesis test of interest is  
+$$H_0: \beta_3 = 0,\ H_a: \beta_3 \neq 0$$ 
+Binomial model: Under $H_0$, $\Delta D\  \dot{\sim} \ \chi^2_{`r binomialDevianceDf`}$:
+$$\Delta D = D_0 - D_a = `r binomialModel2$deviance` - `r binomialModel1$deviance` = `r binomialDeviance`$$  
+Binary model: Under $H_0$, $\Delta D\ \dot{\sim} \ \chi^2_{`r binaryDevianceDf`}$:
+$$\Delta D = D_0 - D_a = `r binaryModel2$deviance` - `r binaryModel1$deviance` = `r binaryDeviance`$$
+The above agrees with the derivation in question 1c i.e. that the deviance test statistics for testing nested models are equivalent.

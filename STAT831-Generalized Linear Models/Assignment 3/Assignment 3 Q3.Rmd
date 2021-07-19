@@ -1,0 +1,164 @@
+---
+title: "Assignment 3"
+author: "Branden Lee"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(latex2exp)
+library(gridExtra)
+library(plyr)
+```
+
+### Question 3
+
+#### a)
+```{r}
+freq <- c(117,85,119,67,121,98,209,99,47,43,68,46,22,20,43,33)
+names <- list(chol = c('<200', '200-219', '220-259', '260+'),
+              pres = c('<127', '127-146', '147-166', '167+'))
+heartDisease.2D <- array(freq, c(4,4), dimnames=names)
+
+
+heartDisease <- count(as.table(heartDisease.2D))
+heartDisease <- heartDisease[,1:3]
+names(heartDisease) <- c('chol', 'pres', 'Y')
+
+modela <- glm(Y~chol+pres, family=poisson, data=heartDisease)
+modelb <- glm(Y~chol*pres, family=poisson, data=heartDisease)
+
+pVal <- pchisq(modela$deviance-modelb$deviance, 
+               modela$df.residual-modelb$df.residual,
+               lower.tail=FALSE)
+```
+Since this data contains only two factor variables, the saturated model is equivalent to the full interaction model. The $p$ value for testing whether the main effects model is adequate compared to the saturated model is `r pVal`<.05, so we reject the null hypothesis: that is, there is evidence of interaction between some levels of blood pressure and cholesterol. This can be interpreted to mean that certain levels of cholesterol are more likely to be accompanied with certain levels of blood pressure than others and vice versa.
+
+#### b)
+```{r}
+countTable <- xtabs(Y~chol+pres, heartDisease)
+prop.table(addmargins(countTable, margin=1), margin=1) # Row percentages
+prop.table(addmargins(countTable, margin=2), margin=2) # Column percentages
+```
+Looking at the row percentages (1st table), we can see that as cholesterol level increases, there seems to be a systematic increase in blood pressure. In other words, when comparing groups according to two fixed levels of cholesterol, those with the higher cholesterol level have a larger proportion of the with higher blood pressure compared to those with lower cholesterol, which confirms the conclusion in part a). In contrast, The column percentages do not reveal any obvious patterns.
+
+#### c)
+```{r}
+y <- heartDisease[heartDisease$chol=='<200' & heartDisease$pres=='<127', 3]
+fitted <- exp(c(1,0,0,0,0,0,0) %*% modela$coef)
+devianceResidual <- (y-fitted)/abs(y-fitted) * sqrt(2 * (y * log(y/fitted) - (y - fitted)))
+devianceResidual
+```
+
+#### d)
+The saturated log-linear model for this 3-way contingency table is
+$$log(\mu_{ijk}) = u + u_i^V + u_j^W + u^Z_k + u_{ij}^{VW} + u_{ik}^{VZ} + u_{jk}^{WZ} + u_{ijk}^{VWZ}$$
+where $V, W, Z$ correspond to the factor variables for cholesterol, blood pressure and coronary heart disease respectively, along with corner point constraints 
+\begin{align*}
+1.& u_1^V=u_1^W=u_k^Z=0\\
+2.& u_{1j}^{VW}=u_{i1}^{VW}=u_{1k}^{VZ}=u_{i1}^{VZ}=u_{j1}^{WZ}=u_{1k}^{WZ}=0\\
+3.& u_{1jk}^{VWZ}=u_{i1k}^{VWZ}=u_{ij1}^{VWZ}=0 
+\end{align*}
+for all $i,j=1,2,3,4$ and $k=1,2$.
+
+#### e)
+```{r}
+heartDisease <- cbind(c(rep(0, nrow(heartDisease))), heartDisease)
+colnames(heartDisease)[1] <- 'case'
+heartDisease <- rbind(heartDisease,
+      cbind(
+        case=c(rep(1, 16)),
+        heartDisease[,2:3],
+        Y=c(2,3,3,4,3,2,1,3,8,11,6,6,7,12,11,11)
+      )
+)
+
+devianceAndDf <- function(x) {
+  c(summary(x)$deviance, summary(x)$df.residual)
+}
+
+model4 <- glm(Y~chol*pres*case, family=poisson, data=heartDisease)
+
+model5 <- glm(Y~chol*pres+chol*case+pres*case, family=poisson,
+                      data=heartDisease)
+
+model6a <- glm(Y~chol+pres+case+chol*pres+chol*case, family=poisson,
+                      data=heartDisease)
+model6b <- glm(Y~chol+pres+case+chol*pres+pres*case, family=poisson,
+                      data=heartDisease)
+model6c <- glm(Y~chol+pres+case+chol*case+pres*case, family=poisson,
+                      data=heartDisease)
+```
+Starting from the saturated model, a deviance test was performed to determine whether the homogeneous association model is adequate. The $p$-value for this test was $\approx$.85, so we do not reject the null hypothesis i.e. the homogeneous association model is adequate compared to the saturated model. 
+
+Next, the homogeneous association models were compared with the 3 possible conditional independence models: the $p$ values for all three tests (found below) were significant at the 95% level, so the conclusion is that the conditional independence models are not adequate compared to the homogeneous association model. 
+
+The plot of residuals vs fitted values for this model exhibits some evidence of heteroscedasticity however aside from that is acceptable. The normal qq plot looks very good for quantiles with the exception of a small number of larger quantiles. The resudiual plots provide evidence of a reasonably good fit. In conclusion, the homogeneous association model provides the best fit among the models fitted.
+
+```{r, echo=FALSE}
+devianceTestPVal <- c(pchisq(model5$deviance-model4$deviance, 
+                             df=model5$df.residual-model4$df.residual,
+                             lower.tail=FALSE),
+                      pchisq(model6a$deviance-model5$deviance,
+                             df=model6a$df.residual-model5$df.residual,
+                             lower.tail=FALSE),
+                      pchisq(model6b$deviance-model5$deviance,
+                             df=model6b$df.residual-model5$df.residual, 
+                             lower.tail=FALSE),
+                      pchisq(model6c$deviance-model5$deviance,
+                             df=model6c$df.residual-model5$df.residual,
+                             lower.tail=FALSE)
+                      )
+
+knitr::kable(
+  cbind(
+    c('VWZ','(VW, VZ, WZ)', '(VW, VZ)', '(VW, WZ)', '(VZ, WZ)'),
+    c(0, 
+      model5$deviance-model4$deviance,
+      model6a$deviance-model5$deviance,
+      model6b$deviance-model5$deviance,
+      model6c$deviance-model5$deviance),
+    c(0, 
+      model5$df.residual-model4$df.residual, 
+      model6a$df.residual-model5$df.residual,
+      model6b$df.residual-model5$df.residual,
+      model6c$df.residual-model5$df.residual
+      ),
+    c('NA', round(devianceTestPVal, digits=5))
+    ),
+  col.names=c('Model', '$\\Delta D$', 'df', '$p$-value'),
+  caption="Deviance test summary"
+  )
+
+fv1 <- model5$fitted.values
+rd1 <- residuals.glm(model5, 'deviance')
+
+plot1 <- ggplot(data.frame(fitted=fv1,resid=rd1), aes(x=fitted, y=resid)) +
+  geom_point() + ylab('Deviance Residual') + xlab('Fitted Values') +
+  geom_hline(yintercept=c(1.96,-1.96), linetype='dashed') +
+  ggtitle('Deviance Residuals')
+plot2 <- ggplot(data.frame(x=rd1), aes(sample=x)) + stat_qq() + stat_qq_line() +
+  ggtitle('Normal QQ Plot')
+grid.arrange(plot1, plot2, ncol=2)
+
+```
+
+#### f)
+```{r}
+or <- exp(c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,1) %*% model5$coef)
+summary(model5)
+```
+The estimated log conditional local odds ratio of having developed coronary heart disease for those with blood pressure 167+ mmHg versus 147-166 mmHg at a cholestorol level of 220-259 mm/100cc is given by
+\begin{align*}
+log(\mu_{342}^{VWZ}&/\mu_{341}^{VWZ})-log(\mu_{332}^{VWZ}/\mu_{331}^{VWZ})\\
+=& [(u+u_3^V+u_4^W+u_2^Z+u_{32}^{VZ}+u_{42}^{WZ}+u_{34}^{VW})-(u+u_3^V+u_4^W+u_{34}^{VW})]\\
+\qquad&- [(u+u_3^V+u_3^W+u_2^Z+u_{32}^{VZ}+u_{32}^{WZ}+u_{33}^{VW})-(u+u_3^V+u_3^W+u_{33}^{VW})]\\
+=& u_{42}^{WZ}-u_{32}^{WZ}
+\end{align*}
+The conditional local odds ratio of interest is then `r or`.
+

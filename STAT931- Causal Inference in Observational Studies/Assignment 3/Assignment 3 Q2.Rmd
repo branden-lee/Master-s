@@ -1,0 +1,57 @@
+---
+title: "Assignment 3"
+author: "Branden Lee 20877653"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 2
+
+#### a)
+Denote the event times $t_1 = 2, t_2 = 3, t_3 = 8$. Then the risk set is
+$$R(t) = 
+\begin{cases}
+\text{\{Barry, Gary, Harry, Larry\}} & t = t_1 \\
+\text{\{Gary, Harry, Larry\}} & t = t_2 \\
+\text{\{Larry\}} & t = t_3
+\end{cases}$$
+So the Cox partial likelihood for $\beta_1$ is
+\begin{align*}
+L_p({\beta_1}) & = \prod_{j=1}^3 \frac{e^{{\beta_1} x_{[j]}}}{\sum_{k \in R(t_j)} e^{{\beta_1} x_k}} \\
+& = \left( \frac{e^{\beta_1}}{e^{\beta_1} + e^0 + e^0 + e^{\beta_1}} \right) \left( \frac{e^0}{e^0 + e^0 + e^{\beta_1}} \right) \left( \frac{e^{\beta_1}}{e^{\beta_1}} \right) \\
+& = \frac{e^{\beta_1}}{2(e^{\beta_1} + 1)(2 + e^{\beta_1})}
+\end{align*}
+
+#### b)
+$\ell_p(\beta_1) = \beta_1 - log2 - log(e^\beta+1) - log(2+e^\beta)$  
+$S_p(\beta_1) = 1 - \frac{e^\beta}{e^\beta+1} - \frac{e^\beta}{2 + e^\beta}$
+
+Solving for $S_p(\beta_1) = 0$:
+\[
+1 - \frac{e^\beta}{e^\beta+1} - \frac{e^\beta}{2 + e^\beta} = 0 \\
+(e^\beta+1)(2+e^\beta) - e^\beta(2+e^\beta) - e^\beta(e^\beta+1) = 0 \\
+e^{2\beta} + 3e^\beta + 2 - 2e^\beta - e^{2\beta} - e^{2\beta} - e^\beta = 0 \\
+2-e^{2\beta}=0
+\]
+$\implies \hat{\beta}_1 = \frac{1}{2}log(2)$.
+
+Confirm it is a local max:
+\begin{align*}
+I(\beta_1) =& -\frac{\partial S_p}{\partial \beta_1} \\
+=& -\left( -\frac{e^\beta (e^\beta + 1) - e^\beta e^\beta}{(e^\beta+1)^2} - {\frac{e^\beta (2 + e^\beta) - e^\beta e^\beta}{(2 + e^\beta)^2}} \right) \\
+=& \frac{e^\beta}{(e^\beta+1)^2} + {\frac{2e^\beta}{(2 + e^\beta)^2}}
+\end{align*}
+Clearly $I(\beta_1)$ for all $\beta_1$, hence $\hat{\beta}_1 = \frac{1}{2}log(2)$ is the maximum partial likelihood estimator of $\beta_1$.
+
+#### c)
+$I(\hat{\beta}_1) = \frac{\sqrt{2}}{(\sqrt{2}+1)^2}+\frac{2\sqrt{2}}{(2+\sqrt{2})^2} = `r 2^.5 / (2^.5+1)^2 + 2^1.5/(2+2^.5)^2`$$  
+The estimated asymptotic variance of $\hat{\beta}_1$ is then $\widehat{Var}(\hat{\beta}_1) = I^{-1}(\hat{\beta}_1) = `r (2^.5 / (2^.5+1)^2 + 2^1.5/(2+2^.5)^2)^-1`$.
+
+

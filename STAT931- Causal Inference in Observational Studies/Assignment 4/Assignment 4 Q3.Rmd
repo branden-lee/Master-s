@@ -1,0 +1,77 @@
+---
+title: "Assignment 4"
+author: "Branden Lee"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(twang)
+```
+
+### Question 3
+
+#### (1)
+```{r}
+set.seed(1)
+
+rhc <- read.csv('rhc.csv', header=TRUE)
+
+# Create factor variables
+rhc$swangf <- ifelse(rhc$swang1=='RHC', 1, 0)
+rhc$catf <- factor(rhc$cat1)
+rhc$caf <- factor(rhc$ca)
+rhc$sexf <- factor(rhc$sex)
+rhc$dnrf <- factor(rhc$dnr1)
+rhc$ninsclasf <- factor(rhc$ninsclas)
+rhc$respf <- factor(rhc$resp)
+rhc$cardf <- factor(rhc$card)
+rhc$neurof <- factor(rhc$neuro)
+rhc$gastrf <- factor(rhc$gastr)
+rhc$renalf <- factor(rhc$renal)
+rhc$metaf <- factor(rhc$meta)
+rhc$hemaf <- factor(rhc$hema)
+rhc$sepsf <- factor(rhc$seps)
+rhc$traumaf <- factor(rhc$trauma)
+rhc$orthof <- factor(rhc$ortho)
+rhc$racef <- factor(rhc$race)
+rhc$incomef <- factor(rhc$income)
+rhc$dth30f <- ifelse(rhc$dth30=='Yes', 1, 0)
+
+ps.rhc <- ps(swangf ~ catf + caf + cardiohx + chfhx + dementhx + psychhx + chrpulhx +
+               renalhx + liverhx + gibledhx + malighx + immunhx + transhx + amihx +
+               age + sexf + edu + das2d3pc + aps1 + scoma1 + meanbp1 + wblc1 + hrt1 +
+               resp1 + temp1 + pafi1 + alb1 + hema1 + bili1 + crea1 + sod1 + pot1 +
+               paco21 + ph1 + wtkilo1 + dnrf + ninsclasf + respf + cardf + neurof + 
+               gastrf + renalf + metaf + hemaf + sepsf + traumaf + orthof + racef +
+               incomef + wtkilo1 + surv2md1,
+             data=as.data.frame(rhc),
+             n.trees=7000,
+             interaction.depth=2,
+             shrinkage=.01,
+             perm.test.iters=0,
+             stop.method=c('es.mean'),
+             estimand='ATE', verbose=FALSE)
+
+treeNum <- ps.rhc$desc$es.mean.ATE$n.trees
+
+rhc.balance <- bal.table(ps.rhc)
+plot(ps.rhc, plots=3)
+```
+The optimal number of trees based on ASAM is `r treeNum`. The propensity score model does a good job of balancing the covariates as seen in the plot above, since the ASMD's for each covariate post-matching is below the 0.2 cutoff. This can be contrasted with the balance before matching, which is quite poor for many covariates. We can deduce from that the model chosen by the algorithm has done a good job estimating the propensity scores.
+
+#### (2)
+```{r}
+# Obtain weights and adjust extreme weights.
+w <- get.weights(ps.rhc, stop.method='es.mean')
+rhc$adjW <- ifelse(w>20, 20, w)
+
+design.ps <- svydesign(ids=~1, weights=~adjW, data=rhc)
+model <- svyglm(dth30f~swangf, design=design.ps)
+summary(model)
+```
+The estimated causal risk difference of RHC is `r model$coef[2]` and is highly statistically significant, so we can conclude that right heart catheterization increases the risk of death within 30 days.

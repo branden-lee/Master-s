@@ -1,0 +1,94 @@
+---
+title: "STAT840 Final Exam"
+author: "Branden Lee"
+date: "4/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1
+
+#### a)
+```{r}
+set.seed(0)
+
+sample_exp <- function(n, mu) {
+  - log(1 - runif(n)) / mu
+}
+```
+Denote by $G$ the cdf of $X\sim g(x)=\mu e^{-\mu x}$. Then $G(X)\sim Unif(0,1)$ and  
+\begin{align}
+G(x) &= \int_0^{\infty}\mu e^{-\mu z}dz = 1-e^{-\mu z}\big|_0^x = 1-e^{-\mu x}\\ \implies u&=1-e^{-\mu x}\iff x=-\frac{1}{\mu}ln(1-u)
+\end{align}
+i.e. for $U\sim Unif(0,1)$, $-\frac{1}{\mu}ln(1-U)\sim X$. Thus to generate $X\sim Exponential(\mu)$ we can generate $U\sim Unif(0,1)$ which gives us $X=-\frac{1}{\mu}ln(1-U)\sim Exponential(\mu)$
+
+
+#### b)
+```{r}
+acceptance_rejection <- function(n, alpha, lambda) {
+  mu <- lambda / alpha
+  M <- alpha ^ alpha * exp(1-alpha) / gamma(alpha)
+  
+  sample <- c()
+  while (length(sample) < n) {
+    candidate <- sample_exp(1, mu)
+    if (runif(1) <= dgamma(candidate, shape=alpha, rate=lambda) / 
+        (M * dexp(candidate, mu))) {
+      sample <- c(sample, candidate)
+        }
+  }
+  sample
+}
+```
+To sample $X$ using the acceptance-rejection algorithm with the highest acceptance probability and the proposal $Exponential(\mu)$, we first need to find $M$ such that
+$$M= sup_{x>0}\frac{f(x)}{g(x)}$$
+$$\implies M=sup_{x>0}\frac{\frac{\lambda^\alpha}{\Gamma(\alpha)} x^{\alpha-1}e^{-\lambda x}}{\mu e^{-\mu x}} =\frac{\lambda^\alpha}{\Gamma(\alpha)\mu} sup_{x>0} x^{\alpha-1}e^{-(\lambda-\mu)x}$$
+$$\implies \frac{d}{dx}\left(x^{\alpha-1}e^{-(\lambda-\mu)x}\right)=(\alpha-1)x^{\alpha-2}e^{-(\lambda-\mu)x}-(\lambda-\mu)x^{\alpha-1}e^{-(\lambda-\mu)x}$$
+which shows that the supremum occurs at $x=\frac{\alpha-1}{\lambda-\mu}$  
+To find the optimal $\mu$ so that the acceptance probability is maximized, we want to minimize $M$ with respect to $\mu$. Note
+$$M=\frac{\lambda^\alpha}{\Gamma(\alpha)\mu} \left(\frac{\alpha-1}{\lambda-\mu}\right)^{\alpha-1}e^{-\alpha-1}\propto\frac{1}{\mu(\lambda-\mu)^{\alpha-1}}$$
+$$\implies\frac{d}{d\mu}\left(\frac{1}{\mu(\lambda-\mu)^{\alpha-1}}\right) =  -\frac{1}{\mu^2(\lambda-\mu)^{\alpha-1}}+\frac{\alpha-1}{\mu(\lambda-\mu)^{\alpha}}$$
+$$\implies\mu=\frac{\lambda}{\alpha}$$
+Using the optimal $\mu$, we get
+$$M=\frac{\alpha^\alpha}{\Gamma(\alpha)}e^{-(\alpha-1)}$$
+
+#### c)
+```{r}
+ci <- function(mean, sd) {
+  mean + sd * qnorm(c(0.025, 0.975))
+}
+
+delta <- function(x) {
+  8 * log(1+x^2) * (x > 1 & x < 5) / 3 ^ 4
+}
+
+mc <- function(n, alpha, lambda) {
+  sample <- acceptance_rejection(1000, alpha, lambda)
+  
+  est <- mean(sapply(sample, delta))
+  se <- sd(sapply(sample,delta)) / sqrt(n)
+  # se <- sqrt(mean((sapply(sample, delta) - est)^2) / (n - 1))
+  
+  c(est, se)
+}
+
+output <- mc(1000, 5, 3)
+
+
+
+est <- output[1]
+se <- output[2]
+ci <- ci(output[1], output[2])
+est # Monte Carlo estimate
+se # Standard error
+ci # 95% CI
+```
+Note for $\alpha=5,\ \beta=3$
+$$f(x)=\frac{3^5}{4!}x^4e^{-3x}$$
+So a Monte Carlo estimate of $\theta=\int_1^5 log(1+x^2)x^4e^{-3x}dx$ is
+$$\hat\theta=\sum_{i=1}^n \delta(X_i)=\sum_{i=1}^n\frac{24}{3^5} log(1+X_i^2) I(1<X_i<5)$$

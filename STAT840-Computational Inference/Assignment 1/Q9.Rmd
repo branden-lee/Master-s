@@ -1,0 +1,68 @@
+---
+title: "STAT840 A1Q9"
+author: "Branden Lee 20877653 Graduate student"
+date: "14/02/2021"
+header-includes:
+  - \usepackage{caption}
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### a, b)
+```{r}
+set.seed(0)
+
+ci95 <- function(mean, variance) mean + qnorm(.975) * sqrt(variance) * c(-1, 1)
+
+delta <- function(x) {
+  1.25 * (x^2 + 3) ^-7
+}
+
+mc_estimate <- function(n) {
+  sample <- rgeom(n, .8)
+  
+  est <- mean(sapply(sample, FUN=delta))
+  
+  var <- (mean(sapply(sample, FUN=function(x) delta(x)^2)) - est^2) / n
+  
+  c(est, var)
+}
+est1 <- mc_estimate(1000)
+est2 <- mc_estimate(10000)
+est3 <- mc_estimate(100000)
+
+theta1 <- est1[1]
+theta2 <- est2[1]
+theta3 <- est3[1]
+
+var1 <- est1[2]
+var2 <- est2[2]
+var3 <- est3[2]
+
+ci1 <- ci95(theta1, var1)
+ci2 <- ci95(theta2, var2)
+ci3 <- ci95(theta3, var3)
+```
+\begin{center}
+\captionof{table}{Monte Carlo Estimates for $n=1000, 10000, 100000$}
+\begin{tabular}{|l|l|l|l|}
+\hline
+$n$ & $a)\ \widehat{\theta}$ & $\widehat{Var}(\widehat{\theta})$ & $b)\ 95\% CI$\\ \hline
+1000 & `r theta1` & `r var1` & (`r ci1`) \\ \hline
+10000 & `r theta2` & `r var2` & (`r ci2`) \\ \hline
+100000 & `r theta3` & `r var3` & (`r ci3`) \\  \hline
+\end{tabular}
+\end{center}
+
+#### c)
+We can see that for a very small sample size ($n$=18), a confidence interval of length roughly .0002 can be obtained.
+```{r}
+e3 <- mc_estimate(18)
+ci3 <- ci95(e3[1], e3[2])
+abs(ci3[1] - ci3[2])
+```

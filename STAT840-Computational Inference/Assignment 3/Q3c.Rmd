@@ -1,0 +1,150 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE}
+library(binaryLogic)
+
+set.seed(0)
+
+beta <- 0.1
+
+x <- c(-4.2, -2.85, -2.3, -1.02, 0.7, 0.98, 2.72, 3.5)
+
+n <- length(x)
+
+log_likelihood <- function(alpha) n * (log(beta) - log(pi)) - 
+  sum(sapply(x, function(x) log(beta^2 + (x - alpha)^2)))
+```
+#### c)
+```{r}
+# Fitness function
+fitness <- function(alpha) {prod(dcauchy(x, location=alpha, scale=beta))}
+
+# Left pad a binary number x with 0s for a total of k binary digits
+left_pad_bin <- function(x, k) {
+  c(rep(0, k - length(x)), x)
+}
+
+# Convert a k digit binary number to an integer
+bin_to_int <- function(x, k) {
+  x %*% (2 ^ seq(k - 1, 0, -1))
+}
+
+# Convert a k digit binary number to its corresponding grid value in a specified
+# interval
+bin_to_grid <- function(x, k, int) int[1] + 
+  (int[2] - int[1]) * bin_to_int(x, k) / (2^k - 1)
+
+# Implementation of the genetic algorithm for this problem. Returns
+# the resulting population once the algorithm satisfies the convergence
+# criteria.
+# pop is the initial population (must be even number of individuals)
+# int is the interval in which to search for the max
+# grid_size specifies the maximum distance between two adjacent points
+# considered by the algorithm. The true mesh width will be smaller than this.
+# p_co is the rate at which parents will crossover
+# p_mut is the rate at which a mutation will occur in the population
+# n_gen_homo is the number of generations for which the average and best fitness
+# will be compared to determine convergence to a max
+# pop_homo is the minimum range of average fitness over n_gen_homo
+# generations before a solution will be considered as a maximizer
+# epsilon is the minimum range of best fitness over n_gen_homo generations
+# before a solution will be considered as a maximizer
+
+genetic_algorithm <- function(pop, int, grid_size, p_co, p_mut, pop_homo, 
+                              n_gen_homo, epsilon, max_gen) {
+  pop_size <- length(pop)
+  int_len <- int[2]- int[1]
+
+  k <- 0
+  while (int_len * (2 ^ -k) > grid_size) {k <- k + 1}
+
+  bin_grid <- int[1] + int_len * seq(0, 2 ^ k - 1) / (2 ^ k - 1)
+
+  pop_bin <- c()
+  for (org in pop) {
+    best_bin <- 1
+    for (i in seq(2, length(bin_grid))) {
+      if (abs(bin_grid[best_bin] - org) > abs(bin_grid[i] - org)) {
+        best_bin <- i
+      }
+    }
+    pop_bin <- rbind(pop_bin, left_pad_bin(as.binary(best_bin - 1), k))
+  }
+  
+  pop <- apply(pop_bin, MARGIN=1,function(x) bin_to_grid(x,k,int))
+  f <- sapply(pop, fitness)
+  best_sol <- c(pop_bin[which.max(f),])
+  best_fitness <- c(max(f))
+  avg_fitness <- c(mean(f))
+
+  for (n in 1:max_gen) {
+    parents <- pop_bin[sample(pop_size, size=pop_size, replace=TRUE, prob=f),]
+
+    for (i in seq(1, pop_size, 2)) {
+      if (runif(1) <= p_co) {
+        crossover_ind <- sample(k-1, size=1)
+
+        pop_bin[i,] <- c(parents[i, 1:crossover_ind], 
+                         parents[i+1, (crossover_ind+1):k])
+        pop_bin[i+1,] <- c(parents[i+1, 1:crossover_ind], 
+                           parents[i, (crossover_ind+1):k])
+      }
+
+      if (runif(1) <= p_mut) {
+        mut_ind <- sample(which(pop_bin[i,]==pop_bin[i+1,]), size=1)
+        pop_bin[i, mut_ind] <- (pop_bin[i, mut_ind] + 1) %% 2
+      }
+      if (runif(1) <= p_mut) {
+        mut_ind <- sample(which(pop_bin[i,]==pop_bin[i+1,]), size=1)
+        pop_bin[i+1, mut_ind] <- (pop_bin[i+1, mut_ind] + 1) %% 2
+      }
+    }
+
+    pop <- apply(pop_bin, MARGIN=1,function(x) bin_to_grid(x,k,int))
+    f <- sapply(pop, fitness)
+    avg_fitness <- c(avg_fitness, mean(f))
+    best_fitness <- c(best_fitness, max(f))
+    best_sol <- rbind(best_sol, pop_bin[which.max(f),])
+
+    if (abs(diff(range(tail(best_fitness, n_gen_homo)))) < 
+        epsilon & abs(diff(range(tail(avg_fitness, n_gen_homo)))) < pop_homo) {
+      break
+    }
+  }
+  candidates <- apply(tail(best_sol, n_gen_homo), MARGIN=1, function(z)
+    bin_to_grid(z,k,int))
+  sol <- candidates[which.max(tail(best_fitness, n_gen_homo))]
+  
+  return(list(sol,n))
+}
+
+# Genetic algorithm on a random initial population of size 10
+output1 <- genetic_algorithm(runif(10, -5, 5), c(-5,5), 10^-4, .8, .2, 10^-15, 
+                             10, 10^-20, 1000)
+# Genetic algorithm on a random initial population of size 20
+output2 <- genetic_algorithm(runif(20, -5, 5), c(-5,5), 10^-4, .8, .2, 10^-15, 
+                             10, 10^-20, 1000)
+# Genetic algorithm on a random initial population of size 30
+output3 <- genetic_algorithm(runif(30, -5, 5), c(-5,5), 10^-4, .8, .2, 10^-15, 
+                             10, 10^-20, 1000)
+```
+Several parameters were included as part of the implementation. Among those, parameters for both crossover rate and mutation rate were included. Parents were selected for crossover with probability proportional to the Cauchy likelihood we are trying to optimize. Mutation could only occur to loci for which both parents shared the same allele. To determine whether the algorithm had converged to a solution, after each iteration the average and best fitnesses from the 10 most recent iterations are compared, (the number of generations to compare is also included as a parameter for the algorithm), and if the range of both are within prespecified thresholds (included as parameters) then the algorithm terminates and the solution corresponding to the highest fitness in those 10 generations is returned. A maximum number of generations was also included as a parameter, however the stopping criteria was met for most reasonable values of the tuning parameters and was included only to ensure the algorithm would terminate in the case the inputs would result in an endless loop. As can be seen in the output, the values returned are very close to the values returned by the simulated annealing algorithm, and agree with the log-likelihood plot in part a. The number of generations required for the termination criteria to be satisfied increases as the population increases. This makes sense because the termination criteria requires the population to be homogeneous over several generations, so larger populations will require more time for overall fitness to increase.
+
+```{r echo=FALSE}
+knitr::kable(
+rbind(c('10', round(as.numeric(output1[1]), 5), output1[2]),
+      c('20', round(as.numeric(output2[1]), 5), output2[2]),
+      c('30', round(as.numeric(output3[1]), 5), output3[2])),
+col.names=c('Population size', 'Solution', 'Number of Generations'),
+caption="Genetic Algorithm",
+digits=5
+  )
+```

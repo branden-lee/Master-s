@@ -1,0 +1,120 @@
+---
+title: "STAT840 Final Exam"
+author: "Branden Lee"
+date: "4/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 7
+
+#### a)
+```{r}
+set.seed(0)
+data <- read.csv('P5dat.csv', header=TRUE, row.names=1)
+
+Q <- function(alpha, beta, data) {
+  y <- data['y']
+  x <- data['x']
+  
+  sum((y - alpha * x / (1 + beta * x))^2)
+}
+
+### a)
+grad <- function(alpha, beta, data) {
+  y <- data['y']
+  x <- data['x']
+  
+  s_a <- - 2 * sum((y - alpha * x / (1 + beta * x)) * x / (1 + beta * x))
+  s_b <- 2 * sum((y - alpha * x / (1 + beta * x)) * 
+                   (alpha * x ^ 2) / (1 + beta * x) ^ 2)
+  
+  return(c(s_a, s_b))
+}
+
+hessian <- function(alpha, beta, data) {
+  y <- data['y']
+  x <- data['x']
+  
+  i_aa <- 2 * sum(x ^ 2 / (1 + beta * x) ^ 2)
+  i_ab <- 2 * sum((x ^ 2 / (1 + beta * x) ^ 2) * (y - 2 * alpha * x / (1 + beta * x)))
+  i_bb <- 2 * sum((alpha * x ^ 3 / (1 + beta * x) ^ 3) * 
+                     (-2 * y + 3 * alpha * x / (1 + beta * x)))
+  return(matrix(c(i_aa, i_ab, i_ab, i_bb), nrow=2))
+}
+
+NR <- function(alpha, beta, data, delta, epsilon) {
+  s <- solve(hessian(alpha, beta, data), -grad(alpha, beta, data))
+
+  while (abs(s %*% s) >= delta || abs(Q(alpha, beta, data) -
+  Q(alpha + s[1], beta + s[2], data)) >= epsilon) {
+    alpha <- alpha + s[1]
+    beta <- beta + s[2]
+
+    s <- solve(hessian(alpha, beta, data), -grad(alpha, beta, data))
+  }
+  c(alpha, beta)
+}
+
+# a)
+sol_a <- NR(5, 1, data, 10^-2, 10^-3)
+```
+We have  
+$\frac{\partial Q}{\partial \alpha} = 2\sum_{i=1}^n\left(y_i-\frac{\alpha x_i}{1+\beta x_i}\right)\left(-\frac{x_i}{1+\beta x_i}\right)$  
+$\frac{\partial Q}{\partial \beta} = 2\sum_{i=1}^n\left(y_i-\frac{\alpha x_i}{1+\beta x_i}\right)\frac{\alpha x_i^2}{(1+\beta x_i)^2}$  
+\begin{align}\frac{\partial^2 Q}{\partial \alpha^2} &= 2\sum_{i=1}^n\left(-\frac{x_i}{1+\beta x_i}\right)^2\\&=2\sum_{i=1}^n\frac{x_i^2}{(1+\beta x_i)^2}\end{align}  
+\begin{align}\frac{\partial^2 Q}{\partial \alpha\partial \beta}&=\frac{\partial^2 Q}{\partial \beta \partial \alpha}\\ &= 2\sum_{i=1}^n\frac{\alpha x_i^2}{(1+\beta x_i)^2}\left(-\frac{x_i}{1+\beta x_i}\right)+\left(y_i-\frac{\alpha x_i}{1+\beta x_i}\right) \frac{x_i^2}{(1+\beta x_i)^2}\\ &= 2\sum_{i=1}^n\frac{x_i^2}{(1+\beta x_i)^2}\left(y_i-\frac{2\alpha x_i}{1+\beta x_i}\right)\end{align}  
+\begin{align}\frac{\partial^2 Q}{\partial \beta^2} &= 2\sum_{i=1}^n\frac{\alpha x_i^2}{(1+\beta x_i)^2}\frac{\alpha x_i^2}{(1+\beta x_i)^2}+\left(y_i-\frac{\alpha x_i}{1+\beta x_i}\right)\left(-\frac{2\alpha x_i^3}{(1+\beta x_i)^3}\right)\\&=2\sum_{i=1}^n\frac{\alpha x_i^3}{(1+\beta x_i)^3}\left(-2y_i+3\frac{\alpha x_i}{1+\beta x_i}\right)\end{align} 
+
+These were used in the implementation of the Newton-Raphson algorithm. Thresholds for $\delta$, the distance between two subsequent solutions $\theta_k=(\alpha_k, \beta_k)$ and $\theta_{k+1}=(\alpha_{k+1}, \beta_{k+1})$ as well as $\epsilon$, the distance $\epsilon$ between $Q(\alpha_k, \beta_k)$ $Q(\alpha_{k+1}, \beta_{k+1})$ were included as arguments to be passed in the function so that the user can specify the precision required in the optimizer.  
+
+The only potential flaw with this method is that it is highly sensitive to the initial point used: other initial points further from the returned solution were tried and resulted in either the algorithm taking an unreasonably long amount of time to terminate or running indefinitely.
+
+#### b)
+```{r}
+sol_b <- optim(c(0, 0), function(x) Q(x[1], x[2], data))$par
+```
+
+#### c)
+```{r}
+sol_c <- optim(c(0,0), function(x) Q(x[1], x[2], data), method='BFGS')$par
+```
+
+#### d)
+```{r}
+sol_d <- optim(c(3, 3), function(x) Q(x[1], x[2], data), method='SANN')$par
+```
+
+#### e)
+```{r message=F, warning=F}
+library(GA)
+g <- ga(type='real-valued', fitness=function(x) -Q(x[1], x[2], data),
+        lower=c(-10,-10), upper=c(10,10), maxiter=1000)
+sol_e <- summary(g)$solution
+```
+Default settings were used with a maximum of 1000 iterations allowed before terminating the algorithm.
+
+#### f)
+Based on the initial values chosen below we can see that based on the initial values chosen all algorithms identified roughly the same solution. 
+```{r echo=FALSE}
+format_num <- function(x) {
+  paste('(', round(x[1], 5), ',', round(x[2], 5), ')')
+}
+
+knitr::kable(
+rbind(c('Newton-Raphson', format_num(sol_a), round(Q(sol_a[1], sol_a[2], data), 5)),
+      c('Nelder-Mead', format_num(sol_b), round(Q(sol_b[1], sol_b[2], data), 5)),
+      c('Quasi-Newton', format_num(sol_c), round(Q(sol_c[1], sol_c[2], data), 5)),
+      c('Simulated Annealing', format_num(sol_d), round(Q(sol_d[1], sol_d[2], data), 5)),
+      c('Genetic Algorithm', format_num(sol_e), round(Q(sol_e[1], sol_e[2], data), 5))),
+col.names=c('Method', paste('(', '$\\alpha$', ',',  '$\\beta$', ')'), 
+            paste('Q(', '$\\alpha$', ',', '$\\beta$', ')')),
+caption="Optimization",
+digits=5
+  )
+```

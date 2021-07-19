@@ -1,0 +1,126 @@
+---
+title: "Assignment 2"
+author: "Branden Lee 20877653"
+date: "21/03/2021"
+header-includes:
+  - \usepackage{amsmath}
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 3
+
+#### a)  
+$$\begin{aligned} \pi(\alpha, \eta\mid x_1,...,x_n)&\propto\pi(\alpha, \eta) \prod_{i=1}^{n}f(x_i\mid \alpha, \eta)\\ &\propto e^{-\alpha}\eta^{\beta-1}e^{-c\eta}\prod_{i=1}^n\alpha\eta x_i^{\alpha}e^{-\eta x_i^{\alpha}}\\ &=\alpha^n\eta^{\beta+n-1}exp(-(\alpha+\eta(c+\sum_{i=1}^nx_i^\alpha)))\prod_{i=1}^nx_i^{\alpha-1} \end{aligned}$$
+
+where $n=12$ and $x_i$ are the observed data points.
+
+#### b)  
+$$\begin{aligned}
+&\rho(\alpha',\eta'\mid \alpha^{(t)},\eta^{(t)})=min\left(\frac{\pi(\alpha',\eta'\mid x)\ q(\alpha^{(t)},\eta^{(t)}\mid \alpha',\eta')}{\pi(\alpha^{(t)},\eta^{(t)}\mid x)\ q(\alpha',\eta'\mid \alpha^{(t)},\eta^{(t)})}, 1\right)\\
+&=min\left(\frac{(\alpha')^n(\eta')^{\beta+n-1}exp(-(\alpha'+\eta'(c+\sum_{i=1}^nx_i^{\alpha'})))\prod_{i=1}^n x_i^{\alpha'-1}\cdot \frac{1}{\alpha'\eta'}exp(-\frac{\alpha^{(t)}}{\alpha'}-\frac{\eta^{(t)}}{\eta'})}{(\alpha^{(t)})^n(\eta^{(t)})^{\beta+n-1}exp(-(\alpha^{(t)}+\eta^{(t)}(c+\sum_{i=1}^nx_i^{\alpha^{(t)}})))\prod_{i=1}^nx_i^{\alpha^{(t)}-1}\ \frac{1}{\alpha^{(t)}\eta^{(t)}}exp(-\frac{\alpha'}{\alpha^{(t)}}-\frac{\eta'}{\eta^{(t)}})}, \ 1\right)\\
+&=min\left(\left(\frac{\alpha'}{\alpha^{(t)}}\right)^{n-1}\left(\frac{\eta'}{\eta^{(t)}}\right)^{\beta+n-2}\prod_{i=1}^n x_i^{\alpha'-\alpha^{(t)}}\frac{exp\left(-\alpha'-\eta'(c+\sum_{i=1}^nx_i^{\alpha'})-\frac{\alpha^{(t)}}{\alpha'}-\frac{\eta^{(t)}}{\eta'}\right)}{exp\left(-\alpha^{(t)}-\eta^{(t)}(c+\sum_{i=1}^nx_i^{\alpha^{(t)}})\ -\frac{\alpha'}{\alpha^{(t)}}-\frac{\eta'}{\eta^{(t)}}\right)}, \ 1\right)
+\end{aligned}$$
+
+#### c)  
+
+```{r}
+set.seed(0)
+
+data <- c(0.56, 2.26, 1.9, 0.94, 1.4, 1.39, 1, 1.45, 2.32, 2.08, 0.89, 1.68)
+
+f <- function(x, alpha, eta) alpha * eta * x^(alpha-1) * exp(-eta * x^alpha)
+
+q <- function(x, y, alpha, eta) dexp(x, 1 / alpha) * dexp(y, 1 / eta)
+
+prior <- function(alpha, eta, beta, c) exp(-alpha - c * eta) * eta ^ (beta - 1)
+
+posterior <- function(alpha, eta, beta, c) {
+  prior(alpha, eta, beta, c) * prod(sapply(data, function(x) f(x, alpha, eta)))
+}
+
+generate_sample <- function(sample_size, alpha0, eta0, beta, c) {
+  alpha <- alpha0
+  eta <- eta0
+  sample <- c()
+  n <- 0
+  num_accepted <- 0
+  while (n < sample_size) {
+    alpha_new <- rexp(1, 1 / alpha)
+    eta_new <- rexp(1, 1/ eta)
+    new <- FALSE
+    
+    r <- log(posterior(alpha_new, eta_new, beta, c)) + log(q(alpha, eta, alpha_new, eta_new)) -
+    log(posterior(alpha, eta, beta, c)) - log(q(alpha_new, eta_new, alpha, eta))
+    if (r > 0 || log(runif(1)) <= r) {
+      alpha <- alpha_new
+      eta <- eta_new
+      num_accepted <- num_accepted + 1
+    }
+    sample <- rbind(sample, c(alpha, eta))
+    n <- n + 1
+  }
+  return(list(sample, num_accepted / nrow(sample)))
+}
+
+output <- generate_sample(15000, 2.5, .5, 1, 1)
+sample_alpha <- output[[1]][5001:15000,1]
+sample_eta <- output[[1]][5001:15000,2]
+acceptance_rate <- output[[2]]
+```
+The algorithm is as follows  
+Step 1) Set $t=0$, and initialize $\alpha_t, \eta_t$  
+Step 2) Sample $(\alpha', \eta')\sim q(\alpha, \eta\mid \alpha^{(t)}, \eta^{(t)})$  
+Step 3) If $r=\rho(\alpha',\eta'\mid \alpha^{(t)},\eta^{(t)})>1$ set $(\alpha^{(t+1)}, \eta^{(t+1)})=(\alpha', \eta')$. Otherwise generate $u\sim Unif(0,1)$: if $u\leq r$ then set $(\alpha^{(t+1)}, \eta^{(t+1)})=(\alpha', \eta')$ otherwise set $(\alpha^{(t+1)}, \eta^{(t+1)})=(\alpha^{(t)}, \eta^{(t)})$  
+Step 4) Return to step 2 until the desired sample size $N$ is achieved  
+Step 5) Return ${(\alpha_t, \eta_t), ..., (\alpha_N, \eta_N)}$
+
+The time series plots for the marginals indicate that the chain converges quite quickly, as the behaviour of the chain seems to stabilise within 1000-2000 steps. The relative frequencies also support convergence as the empirical densities look quite well behaved. Various values for the prior hyperparameters $\beta$, $\eta$ in the range of about $(0,10)$ were used to see if better results could be achieved, however all values tried resulted in relatively similar samples, time series plots and acceptance rates $(\approx0.08)$. In particular, the acceptance rate hovered around 0.08 for all values of the hyperparameters and tuning parameters tried, suggesting that this particular chain cannot sample from the the target distribution very efficiently.
+```{r, echo=FALSE}
+plot(x=seq(1, length(output[[1]][,1])), y=output[[1]][,1], type='l', xlab='t', 
+     ylab=expression(alpha[t]), main=bquote('Time Series Plot of ' ~ alpha[t]))
+plot(x=seq(1, length(output[[1]][,2])), y=output[[1]][,2], type='l', xlab='t', 
+     ylab=expression(eta[t]), main=bquote('Time Series Plot of ' ~ eta[t]))
+
+hist(sample_alpha, freq=FALSE, main=bquote('Empirical Density'~alpha), xlab=expression(alpha))
+hist(sample_eta, freq=FALSE, main=bquote('Empirical Density'~eta), xlab=expression(eta))
+```
+
+
+
+#### d,e)  
+```{r}
+calculate_mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+est_alpha <- mean(sample_alpha)
+est_eta <- mean(sample_eta)
+
+mode_alpha <- calculate_mode(sample_alpha)
+mode_eta <- calculate_mode(sample_eta)
+
+quantileCI_alpha <- quantile(sample_alpha, probs=c(.025,.975))
+quantileCI_eta <- quantile(sample_eta, probs=c(.025,.975))
+```
+The posterior mean, modes and 95% quantile-based confidence intervals for $\alpha, \eta$ can be found in the table below.
+```{r echo=FALSE}
+format_interval <- function(x) {
+  paste0('(', round(x[1], 5), ', ', round(x[2], 5), ')')
+}
+
+knitr::kable(
+cbind(c('$\\alpha$', '$\\eta$'),
+      c(round(est_alpha, 5), round(est_eta, 5)),
+      c(round(mode_alpha, 5), round(mode_eta, 5)),
+      c(format_interval(quantileCI_alpha), format_interval(quantileCI_eta))),
+col.names=c('Parameter', 'Posterior Mean', 'Posterior Mode', '$95\\%$ Quantile Based CI'),
+caption="Estimates", escape=FALSE
+)
+```

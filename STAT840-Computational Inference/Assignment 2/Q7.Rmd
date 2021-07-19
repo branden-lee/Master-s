@@ -1,0 +1,105 @@
+---
+title: "Assignment 7"
+author: "Branden Lee 20877653"
+date: "21/03/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 7
+
+#### a)
+```{r}
+# Parameters for distribution of m1
+a0 <- 0.25
+b0 <- 4
+
+# Weight data
+w <- c(1.6907, 1.7242, 1.7552, 1.7842, 1.8113, 1.8369, 1.8610, 1.8839)
+
+# Number killed data
+y <- c(6, 13, 18, 28, 52, 53, 61, 60)
+
+# Number exposed data
+n <- c(59, 60, 62, 56, 63, 59, 62, 60)
+
+# x as a function of mu and sigma
+x <- function(mu, sigma) (w - mu) / sigma
+
+# probability of death as a function of x and m1
+prob <- function(x, m1) 1 / (1 + exp(-x)) ^ m1
+
+# Prior density of sigma
+sigma_prior <- function(x) 1 / x
+
+# Prior density of gamma
+gamma_prior <- function(x) dgamma(x, shape=a0, scale=b0)
+
+# Log posterior density
+log_posterior <- function(theta1, theta2, theta3) {
+  mu <- theta1
+  sigma <- exp(theta2)
+  m1 <- exp(theta3)
+  
+  p <- sapply(x(mu, sigma), function(z) prob(z, m1))
+  
+  a0 * theta3 - exp(theta3) / b0 + sum(y * log(p) + (n - y) * log(1 - p))
+}
+```
+
+#### b)
+```{r}
+set.seed(0)
+
+generate_sample <- function(init, sample_size) {
+  theta <- init
+  sample <- matrix(nrow=1, ncol=3)
+  num_acceptances <- 0
+  while (nrow(sample) <= sample_size) {
+    proposal <- theta + sapply(c(.00012, .033, .1), function(x) rnorm(1, sd=sqrt(x)))
+    r <- log_posterior(proposal[1], proposal[2], proposal[3]) -
+      log_posterior(theta[1], theta[2], theta[3])
+    if (r > 0 || log(runif(1)) <= r) {
+      theta <- proposal
+      num_acceptances <- num_acceptances + 1
+    }
+    sample <- rbind(sample, theta)
+  }
+  sample <- sample[-1,]
+  return(list(sample, num_acceptances / nrow(sample)))
+}
+output <- generate_sample(c(2,-3,-1), 20000)
+
+# all observations from the chain
+chain <- output[[1]]
+
+# sample with conservative burn in
+sample <- chain[10001:20000,]
+
+acceptance_rate <- output[[2]]
+theta_quantiles <- apply(sample, MARGIN=2, FUN=quantile, c(.05, .95))
+```
+As can be seen in the histograms of the marginal frequencies below, the marginal distributions seem to be converging. The time series plot show that the marginals seem to be converging within 2000-3000 steps. To generate the sample, the 10000 points sampled were discarded. The 5th and 95% percentiles for the original parameters $\mu, \sigma$ and $m_1$ can be found in the table below. Various initial points were tried, all leading to similar results.
+```{r echo=FALSE}
+knitr::kable(
+cbind(round(theta_quantiles[,1], 5),
+      round(exp(theta_quantiles[,2]), 5),
+      round(exp(theta_quantiles[,3]), 5)),
+col.names=c('$\\mu$', '$\\sigma$', '$m_1$'),
+caption="Empirical Quantiles"
+  )
+plot(x=seq(length(chain[,1])), y=chain[,1], type='l', xlab='t', 
+     ylab=expression(mu), main=bquote('Time Series Plot ' ~ mu))
+plot(x=seq(length(chain[,2])), y=exp(chain[,2]), type='l', xlab='t', 
+     ylab=expression(sigma), main=bquote('Time Series Plot ' ~ sigma))
+plot(x=seq(length(chain[,3])), y=exp(chain[,3]), type='l', xlab='t', 
+     ylab=expression(Z[t]), main=bquote('Time Series Plot ' ~ m[1]))
+hist(sample[,1], main=expression(paste('Frequency Histogram, ', mu)), xlab=expression(mu), freq=FALSE)
+hist(exp(sample[,2]), main=expression(paste('Frequency Histogram, ', sigma)), xlab=expression(sigma), freq=FALSE)
+hist(exp(sample[,3]), main=expression(paste('Frequency Histogram, ', m[1])), xlab=expression(m[1]), freq=FALSE)
+```

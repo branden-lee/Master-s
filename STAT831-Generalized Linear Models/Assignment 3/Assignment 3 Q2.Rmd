@@ -1,0 +1,204 @@
+---
+title: "Assignment 3"
+author: "Branden Lee"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(latex2exp)
+library(gridExtra)
+```
+
+### Question 2
+
+```{r}
+moped <- read.table("moped.txt", header=TRUE)
+moped$classf <- factor(moped$class)
+moped$agef <- factor(moped$age)
+moped$zonef <- factor(moped$zone)
+```
+
+
+#### a)
+```{r}
+# main effects model with all explanatory variables included
+model1 <- glm(number ~ classf + agef + zonef + offset(log(duration)), family=poisson, 
+              data=moped)
+
+# main effects models with one explanatory variable excluded
+model2a <- glm(number ~ classf + agef + offset(log(duration)), family=poisson, 
+              data=moped)
+model2b <- glm(number ~ classf + zonef + offset(log(duration)), family=poisson, 
+              data=moped)
+model2c <- glm(number ~ agef + zonef + offset(log(duration)), family=poisson, 
+              data=moped)
+
+# interaction models with one interaction included
+model3a <- glm(number ~ classf + agef + zonef +  classf * agef + offset(log(duration)),
+               family=poisson, data=moped)
+model3b <- glm(number ~ classf + agef + zonef +  classf * zonef + offset(log(duration)),
+               family=poisson, data=moped)
+model3c <- glm(number ~ classf + agef + zonef +  agef * zonef + offset(log(duration)),
+               family=poisson, data=moped)
+
+# interaction models with class/age interaction and additional interaction term
+model4a <- glm(number ~ classf * agef + classf * zonef + offset(log(duration)),
+               family=poisson, data=moped)
+model4b <- glm(number ~ classf * agef + agef * zonef + offset(log(duration)),
+               family=poisson, data=moped)
+
+```
+
+First, deviance tests were performed comparing the full main effects model against each of the two variable main effects models. The $p$-values (rounded to 5 decimal digits) for these tests can be found below in Table 1: based on these tests, the reduced models with just two factor variables are not adequate compared to the full main effects model.
+
+Next, models with a single 2 way interaction were fitted for each possible 2 way interaction, and a deviance test was performed for each of these models the $p$-values for these tests can be found in Table 2 below. The conclusion drawn from these deviance tests is that the main effects model is adequate when compared to the age/zone and class/zone interaction models, however is not adequate when compared to the model with the age/class interaction.
+
+Finally, deviance tests were performed comparing the age/class interaction model with models that included an additional interaction term. The $p$-values for these tests can be found in Table 3 below, from which it can concluded that the age/class interaction model is adequate. Based on these series of deviance tests, the best model is the age/class interaction model.
+
+```{r echo=FALSE}
+pVal <- function(x) {
+  pchisq(x[1], df=x[2], lower.tail=FALSE)
+}
+
+devianceAndDf <- function(x) {
+  summ <- summary(x)
+  c(summ$deviance, summ$df.residual)
+}
+
+# Create list of models to apply functions to entire list rather than one at a time
+models1 <- list(model2a, model2b, model2c)
+models2 <- list(model3a, model3b, model3c)
+models3 <- list(model4a, model4b)
+
+# Calculate and vectorize the deviance statistics and degrees of freedom for these 
+# test statistics
+test1 <- sapply(models1, FUN=devianceAndDf) - devianceAndDf(model1)
+test2 <- devianceAndDf(model1) - sapply(models2, FUN=devianceAndDf)
+test3 <- devianceAndDf(model3a) - sapply(models3, FUN=devianceAndDf)
+
+summary(model3a)
+
+# Pretty table for models, statistics and p values
+knitr::kable(
+  cbind(
+    c('2a. class, age', '2b. class, zone', '2c. age, zone'),
+    round(t(test1), digits=5),
+    round(apply(test1, MARGIN=2, pVal), digits=5)
+    ),
+  col.names=c('Model', '$\\Delta D$', 'degrees of freedom', '$p_{val}$'),
+  caption="Deviance tests for partial vs full main effects models"
+  )
+knitr::kable(
+  cbind(
+    c('3a. class/age interaction', '3b. class/zone interaction', '3c. age/zone interaction'),
+    round(t(test2), digits=5),
+    round(apply(test2, MARGIN=2, pVal), digits=5)
+    ),
+  col.names=c('Model', '$\\Delta D$', 'degrees of freedom', '$p_{val}$'),
+  caption="Deviance tests for full main effects model vs single interaction models"
+  )
+knitr::kable(
+  cbind(
+    c('4a. class/age and class/zone interaction', '4b. class/age and age/zone interaction'),
+    round(t(test3), digits=5),
+    round(apply(test3, MARGIN=2, pVal), digits=5)
+    ),
+  col.names=c('Model', '$\\Delta D$', 'degrees of freedom', '$p_{val}$'),
+  caption="Deviance tests for class/age interaction model vs two term interaction models"
+  )
+
+# plotResiduals <- function(model, title) {
+#   fv <- model$fitted.values
+#   rd <- residuals.glm(model, 'deviance')
+# 
+#   ggplot(data.frame(fitted=fv,resid=rd), aes(x=fitted, y=resid)) +
+#   geom_point() + ylab('Deviance Residuals') + xlab(TeX('Fitted Values')) +
+#   geom_hline(yintercept=c(1.96,-1.96), linetype='dashed') +
+#   ggtitle(title)
+# }
+# plot1 <- plotResiduals(model3a, 'Model 1 (Main Effects)')
+# plot2a <- plotResiduals(model2a, 'Model 2a')
+# plot2b <- plotResiduals(model2b, 'Model 2b')
+# plot2c <- plotResiduals(model2c, 'Model 2c')
+# plot3a <- plotResiduals(model3a, 'Model 3a')
+# plot3b <- plotResiduals(model3b, 'Model 3b')
+# plot3c <- plotResiduals(model3c, 'Model 3c')
+# plot4a <- plotResiduals(model4a, 'Model 4a')
+# plot4b <- plotResiduals(model4b, 'Model 4b')
+# grid.arrange(
+#   grobs = list(plot1, plot2a, plot2b, plot2c, plot3a, plot3b, plot3c, plot4a, plot4b),
+#   widths=c(1,1,1),
+#   layout_matrix=rbind(c(1,2,3),c(4,5,6),c(7,8,9))
+# )
+```
+
+#### b)
+```{r}
+x <- c(1,0,1,0,0,1,0,0,0,0)
+estimate <- exp(x %*% model3a$coef) * 1000
+se <- sqrt(t(x) %*% summary(model3a)$cov.unscaled %*% x)
+ciL <- estimate * exp(-qnorm(.975) * se)
+ciR <- estimate * exp(qnorm(.975) * se)
+```
+The estimate is `r estimate` and the confidence interval for this estimate is (`r ciL`, `r ciR`).
+
+#### c)
+The plot of residuals vs the fitted values show that the residuals seem to be standard normally distributed with no strong evidence of heteroscedasticity. The normal qq plot also shows that the residuals do not stray too far from the standard normal quantiles. The fit of the model seems reasonable based on these two residual plots.
+```{r}
+fv1 <- model3a$fitted.values
+rd1 <- residuals.glm(model3a, 'deviance')
+
+plot1 <- ggplot(data.frame(fitted=fv1,resid=rd1), aes(x=fitted, y=resid)) +
+  geom_point() + ylab('Deviance Residual') + xlab('Fitted Values') +
+  geom_hline(yintercept=c(1.96,-1.96), linetype='dashed') +
+  ggtitle('Deviance Residuals')
+plot2 <- ggplot(data.frame(x=rd1), aes(sample=x)) + stat_qq() + stat_qq_line() +
+  ggtitle('Normal QQ Plot')
+grid.arrange(plot1, plot2, ncol=2)
+```
+
+
+#### d)
+```{r}
+moped$newZonef <- factor(moped$zone, levels=c(4,1,2,3,5,6,7))
+model4a <- glm(number ~ classf + agef + newZonef + offset(log(duration)),
+               family=poisson, data=moped)
+
+levels(moped$newZonef) <- c(4,1,2,3,4,4,4)
+model4b <- glm(number ~ classf + agef + newZonef + offset(log(duration)),
+family=poisson, data=moped)
+
+pVal <- pchisq(model4b$deviance - model4a$deviance, 
+               model4b$df.residual - model4a$df.residual, 
+               lower.tail=FALSE)
+```
+The new model with zone 4 as the baseline is
+$$log(\mu) = \beta_0 + \beta_{class}x_{class} + \beta_{age}x_{age} + \beta_1x_1 + \beta_2x_2 + \beta_3x_3 + \beta_5x_5 + \beta_6x_6 + \beta_7x_7 + log(t)$$
+where $\beta_i$ corresponds to zone $i$. The hypothesis of test of interest is
+$$ H_0: \beta_5=\beta_6=\beta_7=0,\quad H_a: \beta_5\neq 0 \text{ or } \beta_6\neq 0 \text{ or } \beta_7\neq 0$$
+
+The $p$ value for this hypothesis test is `r pVal`, so we do not reject the null hypothesis i.e. the data suggests the difference between zones 4-7 is not significant.
+
+#### e)
+```{r}
+model4c <- glm(number ~ classf + agef + newZonef + classf * agef + offset(log(duration)),
+               family=poisson, data=moped)
+pVal <- pchisq(model4b$deviance - model4c$deviance, 
+               model4b$df.residual - model4c$df.residual, 
+               lower.tail=FALSE)
+summary(model4c)
+```
+The analysis in part d) resulted in the conclusion that grouping zones 4-7 provided a better fit to the data, and is also preferable from the perspective of interpretability due to its simplicity. Part a) suggests it is worth looking into whether the class and age interaction is still significant after zones 4-7 have been grouped. The $p$-value for testing the significance of this interaction is $`r pVal`$, which confirms that the class and age interaction is still significant after grouping zones 4-7. In summary, the final model is
+$$log(\mu) = \beta_0 +\beta_{class} x_{class} + \beta_{age} x_{age} + \beta_1 x_1 + \beta_2 x_2 + \beta_3 x_3 + \beta_{class,age} x_{class}x_{age} + log(t)$$
+with the following coefficient interpretations:  
+$\beta_0:$ The log rate per policy year of claims among mopeds registered to drivers from zones 4-7 that are class 1 and at most 1 year old is `r exp(model4c$coef[1])`.  
+$\beta_{class}$: The log relative rate per policy year of claims among mopeds of class 2 versus those that are class 1, where both are at most 1 year old and are from the same zone (zones 4-7 are treated as the same zone) is `r exp(model4c$coef[2])`.  
+$\beta_{age}$: The log relative rate per policy year of claims among mopeds registered to drivers that are at least 2 years old versus those that are at most 1 year old, where both are from the same zone (zones 4-7 are treated as the same zone) and class 1 is `r exp(model4c$coef[3])`.  
+$\beta_i$ for $i=1,2,3$: The log relative rate per policy year of claims among mopeds registered to drivers from zone 1,2 and 3 verus those from zones 4-7, where both are the same class and age are is `r exp(model4c$coef[4])`, is `r exp(model4c$coef[5])` and is `r exp(model4c$coef[6])` respectively.  
+$\beta_{class,age}$: The log ratio of the relative rate per policy year of claims among mopeds registered to drivers of class 2 versus class 1 whose age is at least 2 years old versus the relative rate among those of class 2 versus class 1 whose age is at most 1 year old is `r exp(model4c$coef[7])`.

@@ -1,0 +1,64 @@
+---
+title: "STAT840 Final Exam"
+author: "Branden Lee"
+date: "4/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 3
+
+#### a)
+```{r}
+set.seed(0)
+
+p <- function(x) 1 / (pi * (1 + x ^ 2))
+
+metropolis <- function(init, n) {
+  x <- init
+  
+  sample <-  c(x)
+  while (length(sample) < n) {
+    proposal <- rnorm(1, mean=x, sd=1)
+    r <- p(proposal) / p(x)
+    if (r > 1 || runif(1) <= r) {x <- proposal}
+    sample <- c(sample, x)
+  }
+  sample
+}
+
+output1 <- metropolis(3, 1000)
+```
+The steps for generating a sample from $\pi(x)$ using a Metropolis algorithm with $N(x,1)$ as the proposal density is as follows:  
+1. Start with initial point $x_0$  
+2. Sample proposal from $x\sim N(x_k, 1)$  
+3. Compute $r=\frac{\pi(x)}{\pi(x_k)}$  
+4. If $r>1$ set $x_{k+1}=x$. Else sample $u\sim Unif(0,1)$: if $u\leq r$ then set $x_{k+1}=x$  
+5. Otherwise set $x_{k+1}=x_k$  
+6. Set $k=k+1$
+6. Go back to step 2 and repeat until desired sample size is obtained  
+
+If the initial point is chosen to be close to the median $x=0$, the Metropolis algorithm seems to stabilise almost instantaneoulsy and certainly well within 1000 iterations. If it is chosen to be further away it still converges relatively quickly.
+The Cauchy density was plotted on top of the relative frequency histogram in which the first 200 observations were discarded. We can see that the sample is quite good.
+
+```{r, echo=FALSE}
+plot(x=1:length(output1), y=output1, type='l', xlab='t',
+     ylab=expression(X[t]), main='Time Series Plot')
+hist(output1[201:1000],  xlab='x', prob=TRUE, main='Relative Frequency')
+curve(dcauchy, add=TRUE)
+```
+
+#### b)
+```{r}
+sample <- output1[201:1000]
+med <- median(sample)
+se <- pi * (1 + med ^ 2) / (2 * sqrt(length(sample)))
+med # Median
+se # Standard error calculated using the formula provided
+```
+For good measure, the first 200 samples were discarded and the remaining 800 were used as the sample. An estimate of the median is $\hat\theta=`r med`$ and its standard error $SE(\hat\theta)=`r se`$.

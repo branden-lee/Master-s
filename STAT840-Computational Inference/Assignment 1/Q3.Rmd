@@ -1,0 +1,68 @@
+---
+title: "STAT840 A1Q3"
+author: "Branden Lee 20877653 Graduate student"
+date: "14/02/2021"
+header-includes:
+  - \usepackage{caption}
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Prior $\pi(\theta) = \frac{\Gamma(\alpha + \beta)}{\Gamma(\alpha)\Gamma(\beta)} \theta^{\alpha-1} (1-\theta)^{\beta-1}$  
+Conditional mass function $f(x\mid \theta) = \prod_{i=1}^{13} f(x_i \mid \theta) = \theta^3(1-\theta)^{10}$  
+Posterior $\pi(\theta\mid x) \propto \pi(\theta) f(x\mid\theta) \propto \theta^{\alpha-1}(1-\theta)^{\beta-1}\theta^3(1-\theta)^{10}=\theta^{\alpha+2}(1-\theta)^{\beta+9}$  
+$\implies \pi(\theta\mid x) \sim Beta(\alpha+3, \beta + 10)$
+
+```{r echo=FALSE}
+library(ggplot2)
+
+ggplot() +
+  geom_function(fun=dbeta, 
+                aes(colour="Beta(0.5, 0.5)"), 
+                args=list(shape1=3.5, shape2=10.5)) +
+  geom_function(fun=dbeta, 
+                aes(colour="Beta(1,1)"),
+                args=list(shape1=4, shape2=11)) +
+  geom_function(fun=dbeta, 
+                aes(colour="Beta(10,10)"),
+                args=list(shape1=13, shape2=20)) +
+  geom_function(fun=dbeta, 
+                aes(colour="Beta(100,100)"),
+                args=list(shape1=103, shape2=110)) +
+  labs(colour=bquote('Prior '~pi~"("~ theta~")")) +
+  xlab(expression(theta)) + ylab(bquote('Posterior density '~pi~"("~theta~"|"~x~")"))
+```
+
+\begin{align*}
+\hat{\theta}_{B} &= E(\theta|x) \\
+&= \int \theta \cdot \pi(\theta \mid x) d\theta \\
+&= \frac{\Gamma(\alpha + \beta + 13)}{\Gamma(\alpha + 3)\Gamma(\beta + 10)} \int \theta \cdot \theta^{\alpha+2}(1-\theta)^{\beta+9} d\theta \\
+&= \frac{\Gamma(\alpha + \beta + 13)}{\Gamma(\alpha + 3)\Gamma(\beta + 10)} \frac{\Gamma(\alpha + 4)\Gamma(\beta + 10)}{\Gamma(\alpha + \beta + 14)} \\
+&= \frac{\alpha + 3}{\alpha+\beta+13}
+\end{align*}
+
+\begin{align*}
+\hat{\theta}_{MAP} &= arg \ max_\theta\  \pi(\theta\mid x)\\
+&= arg \ max_\theta \ log(\pi(\theta\mid x))\\
+&= arg \ max_\theta\{c(x) + (\alpha+2)log\theta + (\beta+9)log(1-\theta)\}\\
+\implies \frac{\partial log(\pi(\theta\mid x))}{\partial\theta} &= \frac{\alpha+2}{\theta} - \frac{\beta+9}{1-\theta}\\
+\implies \ \hat{\theta}_{MAP} &= \frac{\alpha + 2}{\alpha + \beta + 11}
+\end{align*}
+
+\begin{center}
+\captionof{table}{Bayes and Maximum a Posterior Estimates}
+\begin{tabular}{|l|l|l|}
+\hline
+$Prior$ & $\hat{\theta}_B$ & $\hat{\theta}_{MAP}$ \\ \hline
+$Beta(0.5, 0.5)$ & $1/4$ & $5/24$ \\ \hline
+$Beta(1, 1)$ & $4/15$ & $3/14$ \\ \hline
+$Beta(10, 10)$ & $13/33$ & $12/31$ \\  \hline
+$Beta(100, 100)$ & $103/213$ & $102/211$\\ \hline
+\end{tabular}
+\end{center}
+

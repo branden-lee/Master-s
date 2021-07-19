@@ -1,0 +1,234 @@
+---
+title: "STAT840 Final Exam"
+author: "Branden Lee"
+date: "4/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 2
+
+#### a)
+```{r}
+set.seed(51145063)
+
+ci <- function(mean, sd) {
+  mean + sd * qnorm(c(0.025, 0.975))
+}
+
+delta <- function(x) {
+  2 * sqrt(x / (x + 1)) * exp(-x)
+}
+
+
+mc <- function(n) {
+  sample <- runif(n, 1, 3)
+  
+  est <- mean(sapply(sample, delta))
+  se <- sd(sapply(sample, delta)) / sqrt(n)
+  # se <- sqrt((mean(sapply(sample, function(x) delta(x)^2)) - est ^ 2) / n)
+  
+  return(c(est, se))
+}
+```
+Denote $X\sim Unif(1,3)$. Then the density of $X$ is $f_X(x) = \frac{1}{2} I(1<u<3)$, thus
+$$\theta=\int_1^3 \frac{\sqrt{x}}{\sqrt{x+1}} e^{-x}dx=\int_1^3 \left(2\frac{\sqrt{x}}{\sqrt{x+1}} e^{-x}\right)\frac{1}{2}dx=E\left(2\frac{\sqrt{X}}{\sqrt{X+1}} e^{-X}\right)$$
+Then $\theta$ can be estimated using the Monte Carlo approximation 
+$$\hat{\theta} = \sum_{i=1}^n \delta(X_i) = \sum_{i=1}^n 2\frac{\sqrt{X_i}}{\sqrt{X_i+1}} e^{-X_i}$$
+
+```{r echo=FALSE}
+a1 <- mc(100)
+a1_est <- a1[1]
+a1_se <- a1[2]
+a1_ci <- ci(a1[1], a1[2])
+
+a2 <- mc(1000)
+a2_est <- a2[1]
+a2_se <- a2[2]
+a2_ci <- ci(a2[1], a2[2])
+
+a3 <- mc(10000)
+a3_est <- a3[1]
+a3_se <- a3[2]
+a3_ci <- ci(a3[1], a3[2])
+
+knitr::kable(
+rbind(c(100, round(a1[1], 6), round(a1[2], 6), paste('(', round(a1_ci[1],6), ',', round(a1_ci[2],6), ')')),
+      c(1000, round(a2[1], 6), round(a2[2], 6), paste('(', round(a2_ci[1],6), ',', round(a2_ci[2],6), ')')),
+      c(10000, round(a3[1], 6), round(a3[2], 6), paste('(', round(a3_ci[1],6), ',', round(a3_ci[2],6), ')'))),
+col.names=c('Sample size', 'Estimate', 'Standard Error', 'CI'),
+caption="Monte Carlo Estimates"
+  )
+```
+
+#### b)
+```{r}
+g <- function(x) (x - 1) / 2
+
+is <- function(n) {
+  sample <- 1 + 2 * sqrt(runif(n))
+  
+  weighted_obv <- sapply(sample, function(x) delta(x) / (2 * g(x)))
+  
+  est <- mean(weighted_obv)
+  se <- sd(weighted_obv) / sqrt(n)
+
+  plot(sample, weighted_obv, ylab=bquote(delta~'w(x)'), xlab='x', 
+       main=paste('Observed Weighted Values for n =', n))
+  c(est, se)
+}
+```
+Let $c$ denote the normalizing constant for $g(x)$. Then
+$$\int_1^3 c(1-x)dx=c(x-\frac{x^2}{2})\bigg|_1^3=c\left(3-\frac{9}{2}-1+\frac{1}{2}\right)=-2c$$
+i.e. $c=-\frac{1}{2}$. We can then generate from $g(x)$ using the inversion method: $$G(x)=\int_1^x \frac{1}{2}(x-1)dx=\frac{1}{4}x^2-\frac{1}{2}x-\frac{1}{4}+\frac{1}{2}=\frac{1}{4}(x-1)^2$$
+$$\implies \frac{1}{4}(X-1)^2=U\sim Unif(0,1) \\ \implies X=2\sqrt U + 1$$
+Thus we can generate $X_i\sim g(x)$ by generating $U_i\sim Unif(0,1)$ and applying the above transformation. The importance sampling estimate of $\theta$ is then given by
+$$\hat\theta_{IS} = \sum_{i=1}^n 2\frac{\sqrt{X_i}}{\sqrt{X_i+1}} e^{-X_i}\cdot\frac{\frac{1}{2}}{\frac{1}{2}(X_i-1)} = \sum_{i=1}^n 2\frac{\sqrt{X_i}e^{-X_i}}{\sqrt{X_i+1}} \cdot\frac{1}{X_i-1}$$
+
+Based on the plots below of the weighted functions values evaluated at the sample points, we can see that as the sample size gets larger more extreme values of the weighted values $\delta(X_i)w(X_i)$ values are observed where $w(X_i)=\frac{1}{X_i-1}$ are the importance sampling weights).  
+There are indeed some extreme values that occur due to the asymptote at 1 for the importance sampling weights. The larger the sample, the more extreme values tend to occur.
+
+```{r echo=FALSE}
+b1 <- is(100)
+b1_est <- b1[1]
+b1_se <- b1[2]
+b1_ci <- ci(b1[1], b1[2])
+
+b2 <- is(1000)
+b2_est <- b2[1]
+b2_se <- b2[2]
+b2_ci <- ci(b2[1], b2[2])
+
+b3 <- is(10000)
+b3_est <- b3[1]
+b3_se <- b3[2]
+b3_ci <- ci(b3[1], b3[2])
+
+knitr::kable(
+rbind(c(100, round(b1[1], 6), round(b1[2], 6), paste('(', round(b1_ci[1],6), ',', round(b1_ci[2],6), ')')),
+      c(1000, round(b2[1], 6), round(b2[2], 6), paste('(', round(b2_ci[1],6), ',', round(b2_ci[2],6), ')')),
+      c(10000, round(b3[1], 6), round(b3[2], 6), paste('(', round(b3_ci[1],6), ',', round(b3_ci[2],6), ')'))),
+col.names=c('Sample size', 'Estimate', 'Standard Error', 'CI'),
+caption="Monte Carlo Estimates"
+  )
+```
+
+
+#### c)
+```{r}
+eta <- function(x) 2 * exp(-x)
+
+cv <- function(n) {
+  sample <- runif(n, 1, 3)
+  
+  est1 <- mean(sapply(sample, delta))
+  est2 <- mean(eta(sample))
+
+  var1 <- var(sapply(sample, delta)) / n
+  var2 <- var(eta(sample)) / n
+  cov <- mean((sapply(sample, delta) - est1) * (eta(sample) - est2)) / (n - 1)
+  
+  alpha <- - cov / var2
+
+  est <- est1 + alpha * (est2 - (exp(-1) - exp(-3)))
+  se <- sqrt(var1 + 2 * alpha * cov + alpha ^ 2 * var2)
+  
+  c(est, se)
+}
+```
+Samples were taken from $Unif(1,3)$. The control variate $\eta(X)=2e^{-X}$ was used. Note
+$$E(\eta(X))=\int_1^3 2e^{-x} \frac{1}{2}dx = -e^{-x}\bigg|_1^3 = (e^{-1}-e^{-3})$$
+The standard Monte Carlo estimate and its variance were estimated as in part a), as well as the control variate estimate
+$$\hat\theta_{CV}=\sum_{i=1}^n 2e^{-X_i}$$
+its variance and their covariance:
+the parameter $\alpha$ that minimizes the variance
+$$Var(\hat\theta+\alpha(\hat\theta_{CV}-\theta_{CV}))$$
+can be shown to be $\alpha_0=-\frac{Cov(\hat\theta, \hat\theta_{CV})}{Var(\hat\theta_{CV})}$ and was also estimated. The resulting estimate have a significantly smaller standard error in comparison to standard Monte Carlo in part a, supporting our choice of control variate.
+
+```{r echo=FALSE}
+c1 <- cv(100)
+c1_est <- c1[1]
+c1_se <- c1[2]
+c1_ci <- ci(c1[1], c1[2])
+
+c2 <- cv(1000)
+c2_est <- c2[1]
+c2_se <- c2[2]
+c2_ci <- ci(c2[1], c2[2])
+
+c3 <- cv(10000)
+c3_est <- c3[1]
+c3_se <- c3[2]
+c3_ci <- ci(c3[1], c3[2])
+
+knitr::kable(
+rbind(c(100, round(c1[1], 6), round(c1[2], 6), paste('(', round(c1_ci[1],6), ',', round(c1_ci[2],6), ')')),
+      c(1000, round(c2[1], 6), round(c2[2], 6), paste('(', round(c2_ci[1],6), ',', round(c2_ci[2],6), ')')),
+      c(10000, round(c3[1], 6), round(c3[2], 6), paste('(', round(c3_ci[1],6), ',', round(c3_ci[2],6), ')'))),
+col.names=c('Sample size', 'Estimate', 'Standard Error', 'CI'),
+caption="Control Variate Estimates"
+  )
+```
+
+
+#### d)
+```{r}
+antithetic <- function(n) {
+  sample <- runif(n)
+
+  est1 <- mean(sapply(sample, function(x) delta(2*x+1)))
+  est2 <- mean(sapply(sample, function(x) delta(3-2*x)))
+  
+  var1 <- var(sapply(sample, function(x) delta(2*x+1))) / n
+  var2 <- var(sapply(sample, function(x) delta(3-2*x))) / n
+  cov <- mean((sapply(sample, function(x) delta(2*x+1)) - est1) * 
+                (sapply(sample, function(x) delta(3-2*x)) - est2)) / (n - 1)
+  
+  est <- (est1 + est2) / 2
+  se <- sqrt((var1 + 2 * cov + var2) / 4)
+  
+  c(est, se)
+}
+```
+Uniform random variables $U_i\sim Unif(0,1)$ were generated, then transformed:
+$$V_i=2U_i+1,\quad W_i=2(1-U_i)+1=3-2U_i$$
+Both $V_i,W_i\sim Unif(1,3)$. Antithetic estimates were calculated:
+$$\hat\theta_1=\sum_{i=1}^n 2\frac{\sqrt{V_i}}{\sqrt{V_i+1}} e^{-V_i}$$
+$$\hat\theta_2=\sum_{i=1}^n 2\frac{\sqrt{W_i}}{\sqrt{W_i+1}} e^{-W_i}$$
+and corresponding variances and covariance were also estimated, giving us the antithetic estimate
+$$\hat\theta_{AT}=\frac{\hat\theta_1+\hat\theta_2}{2}$$
+with variance
+$$\widehat Var(\hat\theta_{AT})= \frac{1}{4}(\widehat Var(\hat\theta_1) + 2 \widehat Cov(\hat\theta_1, \hat\theta_2) + \widehat Var(\hat\theta_2))$$
+
+```{r echo=FALSE}
+d1 <- antithetic(100)
+d1_est <- d1[1]
+d1_se <- d1[2]
+d1_ci <- ci(d1[1], d1[2])
+
+d2 <- antithetic(1000)
+d2_est <- d2[1]
+d2_se <- d2[2]
+d2_ci <- ci(d2[1], d2[2])
+
+d3 <- antithetic(10000)
+d3_est <- d3[1]
+d3_se <- d3[2]
+d3_ci <- ci(d3[1], d3[2])
+
+knitr::kable(
+rbind(c(100, round(d1[1], 6), round(d1[2], 6), paste('(', round(d1_ci[1],6), ',', round(d1_ci[2],6), ')')),
+      c(1000, round(d2[1], 6), round(d2[2], 6), paste('(', round(d2_ci[1],6), ',', round(d2_ci[2],6), ')')),
+      c(10000, round(d3[1], 6), round(d3[2], 6), paste('(', round(d3_ci[1],6), ',', round(d3_ci[2],6), ')'))),
+col.names=c('Sample size', 'Estimate', 'Standard Error', 'CI'),
+caption="Control Variate Estimates"
+  )
+```
+
+#### e)
+Both the control variate and antithetic methods result in significant variance reduction, with the control variate method and my choice of $eta(x)$ being particularly effective. The importance sampling method however resulted in more unstable estimates and high variance variance than simple Monte Carlo. The extreme values for points sampled near $x=1$ seem to be the source of the instability and high variance. Choosing a better suited envelope will certainly result in better performance from importance sampling.

@@ -1,0 +1,123 @@
+---
+title: "Assignment 2 Q3"
+author: "Branden Lee"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(GLMsData)
+data(toxo)
+
+```
+
+#### Question 3
+
+a)
+```{r}
+toxo$resp <- cbind(toxo$Positive, toxo$Sampled - toxo$Positive)
+plot(
+  x=toxo$Rainfall,
+  y=toxo$Proportion,
+  xlab='Annual Rainfall (mm)',
+  ylab='Proportion Tested Positive for Toxoplasmosis'
+  )
+abline(h=mean(toxo$Proportion), lty=2, col='grey')
+```
+
+The plot does not seem suggest a relationship between toxoplasmosis and rainfall as the data is randomly scattered with no obvious pattern with respect to rainfall.
+
+
+b)
+
+```{r}
+model1 <- glm(resp ~ Rainfall, family = binomial, data = toxo)
+model2 <- glm(resp ~ Rainfall + I(Rainfall^2), family = binomial, data = toxo)
+model3 <- glm(resp ~ Rainfall + I(Rainfall^2) + I(Rainfall^3), family = binomial, data = toxo)
+
+beta1 <- as.vector(model1$coefficients)
+beta2 <- as.vector(model2$coefficients)
+beta3 <- as.vector(model3$coefficients)
+
+x <- seq(1600,2300,2)
+
+y1 <- 1 / (1 + exp(-(beta1[1] + beta1[2] * x)))
+y2 <- 1 / (1 + exp(-(beta2[1] + beta2[2] * x + beta2[3] * x^2)))
+y3 <- 1 / (1 + exp(-(beta3[1] + beta3[2] * x + beta3[3] * x^2 + beta3[4] * x^3)))
+
+plot(
+  x=toxo$Rainfall,
+  y=toxo$Proportion,
+  xlab='Annual Rainfall (mm)',
+  ylab='Proportion Tested Positive for Toxoplasmosis'
+  )
+
+lines(x, y1, lty=1, col='red')
+lines(x, y2, lty=2, col='blue')
+lines(x, y3, lty=3)
+
+legend('topright', legend = c('Model 1', 'Model 2', 'Model 3'), col=c('red', 'blue', 'black'), lty=c(1,2,3), bty='n')
+```
+
+Model 1 and 2 are virtually indistinguishable, and both support the initial , while model 3 seems to be overfitted to the data points where rainfall is between roughly 1800mm and 2000m while fitting poorly for the points for extreme values of rainfall (< 1800mm and > 2100mm).
+
+
+c)
+```{r}
+fv1 <- model1$fitted.values
+rd1 <- residuals.glm(model1, 'deviance')
+plot(x = fv1,
+     y = rd1,
+     xlab='Fitted values',
+     ylab='Deviance Residuals',
+     main='Deviance Residuals vs Fitted Values (Models 1,2)',
+     pch=3,
+     col='red',
+     cex=.8
+)
+
+fv2 <- model2$fitted.values
+rd2 <- residuals.glm(model2, 'deviance')
+points(x = fv2,
+       y = rd2,
+       pch=1,
+       col='blue',
+       cex=.8
+)
+legend('topright', legend = c('Model 1', 'Model 2'), col=c('red', 'blue'), pch=c(3,1), bty='n')
+abline(h=c(1.96,-1.96), lty=2, col='grey')
+
+fv3 <- model3$fitted.values
+rd3 <- residuals.glm(model3, 'deviance')
+plot(x = fv3,
+     y = rd3,
+     xlab='Fitted values',
+     ylab='Deviance Residuals',
+     main='Deviance Residuals vs Fitted Values (Model 3)',
+     pch=2, 
+     col='black',
+     cex=.8
+)
+abline(h=c(1.96,-1.96), lty=2, col='grey')
+
+
+```
+Similar to the model fit, the deviance residuals for models 1 and 2 are almost identical. The residuals for model 3 however seem to have a strong parabolic like pattern, while for models 1 and 2 they seem to resemble $N(0,1)$ random variables moreso then model 3. There does still seem to be a weaker parabolic pattern in the residuals, which suggests the logistic model may not provide a great fit to the model.
+
+
+
+d)
+```{r}
+root1 <- uniroot(function(x) {model3$coefficients %*% c(1, x, x^2, x^3)}, lower=1600, upper=2300)$root
+root2 <- uniroot(function(x) {model3$coefficients %*% c(1, x, x^2, x^3)}, lower=0, upper=1700)$root
+root3 <- uniroot(function(x) {model3$coefficients %*% c(1, x, x^2, x^3)}, lower=root2, upper=root1)$root
+#root <- uniroot(function(x) {model3$coefficients %*% c(1, x, x^2, x^3)}, lower=1698, upper=2236)$root
+
+```
+The median effective dose can be interpreted in this situation as the amount of rainfall the populaiton needs to be exposed to for half of them to test positive for toxoplasmosis. The estimates for ED50 are the roots of 
+$$0 = logit(\frac{1}{2}) = \hat{\beta}_0 + \hat{\beta}_1 x + \hat{\beta}_2 x^2 + \hat{\beta}_3 x^3$$, which are
+$$\delta_.50^1 = `r root1`,\ \delta_.50^2 = `r root2`,\ \delta_.50^3 = `r root3`$$
+The maximum and minimum of the roots nearly cover the entire range of observed values of rainfall, and since they are both median effective doses, all values in between them can also be considered median effective doses. That is to say, the data suggests that increased rainfall does not lead to increased number of positive toxoplasmosis tests.

@@ -1,0 +1,216 @@
+---
+title: "STAT840 Final Exam"
+author: "Branden Lee"
+date: "4/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 8
+
+#### a)
+```{r}
+library(MASS)
+data <- faithful$waiting
+hist(faithful$waiting, freq=FALSE, main='Histogram of Waiting Times', 
+     xlab='minutes')
+```
+
+Based on the histogram the distribution for waiting times seem to be bimodal.
+
+#### b)
+```{r}
+l_obs <- function(p, mu1, mu2, var1, var2, x) {
+  p * dnorm(x, mean=mu1, sd=sqrt(var1)) + (1 - p) * dnorm(x, mean=mu2, sd=sqrt(var2))
+}
+
+EM <- function(init, x, eps) {
+  p <- init[1]
+  mu1 <- init[2]
+  mu2 <- init[3]
+  var1 <- init[4]
+  var2 <- init[5]
+
+  a <- p * dnorm(x, mean=mu1, sd=sqrt(var1)) / l_obs(p, mu1, mu2, var1, var2, x)
+
+  p_new <- mean(a)
+  mu1_new <- sum(x * a) / sum(a)
+  mu2_new <- sum((1 - a) * x) / sum(1 - a)
+  var1_new <- sum(a * (x - mu1_new)^2) / sum(a)
+  var2_new <- sum((1-a) * (x - mu2_new)^2) / sum(1-a)
+  
+  param_iter <- c(p_new, mu1_new, mu2_new, var1_new, var2_new)
+  
+  i <- 1
+  while (i < 25 || sum(log(l_obs(p_new, mu1_new, mu2_new, var1_new, var2_new, x))) -
+           sum(log(l_obs(p, mu1, mu2, var1, var2, x))) > eps) {
+    i <- i + 1
+    
+    p <- p_new
+    mu1 <- mu1_new
+    mu2 <- mu2_new
+    var1 <- var1_new
+    var2 <- var2_new
+  
+    a <- p * dnorm(x, mean=mu1, sd=sqrt(var1)) / l_obs(p, mu1, mu2, var1, var2, x)
+
+    p_new <- mean(a)
+    mu1_new <- sum(x * a) / sum(a)
+    mu2_new <- sum((1 - a) * x) / sum(1 - a)
+    var1_new <- sum(a * (x - mu1_new)^2) / sum(a)
+    var2_new <- sum((1-a) * (x - mu2_new)^2) / sum(1-a)
+    
+    if (i %in% c(2,3,5,10,15,20,25)) {
+      param_iter <- rbind(param_iter,  c(p_new, mu1_new, mu2_new, var1_new, var2_new))
+    }
+    
+  }
+  return(list(c(p_new, mu1_new, mu2_new, var1_new, var2_new), param_iter))
+}
+```
+Let $Z_i\sim^{i.i.d} Bernoulli(\pi)$. Then $x=(x_1,...,x_n)$ is the complete data and $z=(z_1,..., z_n)$ is the missing data.
+$$f_{mis}(z_i\mid \pi)=\pi^{z_i}(1-\pi)^{1-z_i}$$
+So
+$$f_{obs\mid mis}(x_i\mid z_i,\pi, \mu_1, \mu_2, \sigma^2_1, \sigma^2_2)=(\phi_1(x_i))^{z_i}(\phi_2(x_i))^{(1-z_i)}$$
+So the complete likelihood is
+$$L_{com}(\pi, \mu_1, \mu_2, \sigma^2_1, \sigma^2_2\mid x, z)=\prod_{i=1}^n f_{obs\mid mis}(y_i\mid z_i;\pi, \mu_1, \mu_2, \sigma^2_1, \sigma^2_2) f_{mis}(z_i\mid\pi)$$
+The log-likelihood of the complete data is
+\begin{align}\ell_{com}(\pi, \mu_1, \mu_2, \sigma^2_1, \sigma^2_2\mid x, z) &= \sum_{i=1}^n z_i(log\pi + log(\phi_1(x_i))) + (1-z_i)(log(1-\pi)+log(\phi_2(x_i))))
+\\ &= \sum_{i=1}^n z_i\left(log\pi -\frac{1}{2}log(2\pi\sigma_1^2) - \frac{(x_i-\mu_1)^2}{2\sigma_1^2}\right) + \\ \qquad& (1-z_i)\left(log(1-\pi) -\frac{1}{2}log(2\pi\sigma_2^2) - \frac{(x_i-\mu_2)^2}{2\sigma_2^2}\right) \end{align}
+**E step**
+\begin{align*}
+Q(\theta; \hat{\theta}_k) &= E_{mis\mid obs;\hat{\theta}_k}(\ell_{com}) \\
+&=\sum_{i=1}^n  E_{mis\mid obs;\hat{\theta}_k}(z_i)\left(log\pi -\frac{1}{2}log(2\pi\sigma_1^2) - \frac{(x_i-\mu_1)^2}{2\sigma_1^2}\right)+ \\ \qquad &(1- E_{mis\mid obs;\hat{\theta}_k}(z_i))\left(log(1-\pi) -\frac{1}{2}log(2\pi\sigma_2^2) - \frac{(x_i-\mu_2)^2}{2\sigma_2^2}\right)
+\end{align*}
+
+where $\hat{\theta}_k=(\hat{\pi}_k, \hat{\mu}_{1,k}, \hat{\mu}_{2,k},\hat\sigma^2_{1,k}, \hat\sigma^2_{2,k})$ is the value of   $\theta=(\pi,\mu_1,\mu_2, \sigma_1^2, \sigma_2^2)$ at the $k^{th}$ iteration of the EM algorithm. Note
+\begin{align*} 
+E_{mis\mid obs;\hat{\theta}_k}(z_i)&= 0 \cdot f_{mis\mid obs;\hat{\theta}_k}(0\mid x_i;\hat{\theta}_k) + 1 \cdot f_{mis\mid obs;\hat{\theta}_k}(1\mid x_i;\hat{\theta}_k)
+\\ 
+&= \frac{f(x_i, 1\mid \hat\theta_k}{f(x_i\mid \hat\theta_k}
+\\ 
+&= \frac{\hat{p}_k\phi(x_i\mid\hat{\mu}_{1,k}, \hat{\sigma}^2_{1,k})}{\hat{p}_k\phi(x_i\mid\hat{\mu}_{1,k}, \hat{\sigma}^2_{1,k})+(1-\hat{p}_k)\phi(x_i\mid\hat{\mu}_{2,k}, \hat{\sigma}^2_{2,k})}
+\end{align*}
+
+Denote $w_{ik}=E_{mis\mid obs;\hat{\theta}_k}(Z_i)$.  
+
+**M step**  
+\begin{align*}
+\frac{\partial Q}{\partial \pi} &= \sum_{i=1}^n \left(\frac{w_{ik}}{\pi} - \frac{1-w_{ik}}{1-\pi}\right)\\ 
+\frac{\partial Q}{\partial \mu_1} &= \sum_{i=1}^n w_{ik} \left(\frac{x_i-\mu_1}{\sigma_1^2}\right)\\
+\frac{\partial Q}{\partial \mu_2} &= \sum_{i=1}^n (1 - w_{ik}) \left(\frac{x_i-\mu_2}{\sigma_2^2}\right)\\
+\frac{\partial Q}{\partial \sigma^2_1} &= \sum_{i=1}^n w_{ik} \left(-\frac{1}{2\sigma^2_1} + \frac{(x_i-\mu_1)^2}{2\sigma_1^4}\right)\\
+\frac{\partial Q}{\partial \sigma^2_2} &= \sum_{i=1}^n (1 - w_{ik}) \left(-\frac{1}{2\sigma^2_2} + \frac{(x_i-\mu_2)^2}{2\sigma_2^4}\right)\\\end{align*}
+From which it follows
+$$\hat{\pi}_{k+1} = \frac{1}{n}\sum_{i=1}^n w_{ik},\qquad \hat{\mu}_{1,k+1} =  \frac{\sum_{i=1}^nx_iw_{ik}}{\sum_{i=1}^nw_{ik}},\qquad \hat{\mu}_{2,k+1} = \frac{\sum_{i=1}^nx_i(1-w_{ik})}{\sum_{i=1}^n(1-w_{ik})},\qquad $$
+$$\hat{\sigma}^2_{1,k+1} = \frac{\sum_{i=1}^nw_{ik}(x_i-\hat\mu_{1,k})^2}{\sum_{i=1}^nw_{ik}}, \qquad\hat{\sigma}^2_{2,k+1} = \frac{\sum_{i=1}^n(1-w_{ik})(x_i-\hat\mu_{2,k})^2}{\sum_{i=1}^n(1-w_{ik})}$$
+
+
+#### c)
+```{r}
+init_1 <- c(.1, 50, 80, 30, 60)
+init_2 <- c(.5, 20, 90, 40, 7)
+init_3 <- c(.3, 100, 5, 13, 20)
+init_4 <- c(.7, 50, 50, 10, 3)
+
+output1 <- EM(init_1, data, .01)
+output2 <- EM(init_2, data, .01)
+output3 <- EM(init_3, data, .01)
+output4 <- EM(init_4, data, .01)
+
+est1 <- output1[[1]]
+est2 <- output2[[1]]
+est3 <- output3[[1]]
+est4 <- output4[[1]]
+```
+As can be seen below, for the initial points tried the EM converges to the same solution up to permutation of the indices $i=1,2$ and the corresponding probability $\pi$.
+
+```{r, echo=FALSE}
+param_iter1 <- round(output1[[2]], 5)
+
+knitr::kable(
+
+rbind(c('Initial', round(init_1[1], 5), round(init_1[2], 5), round(init_1[3], 5), round(init_1[4], 5), round(init_1[5], 5)),
+      c(1, param_iter1[1], param_iter1[2], param_iter1[3], param_iter1[4], param_iter1[5]),
+      c(2,  param_iter1[2,1], param_iter1[2,2], param_iter1[2,3], param_iter1[2,4], param_iter1[2,5]),
+      c(3,  param_iter1[3,1], param_iter1[3,2], param_iter1[3,3], param_iter1[3,4], param_iter1[3,5]),
+      c(5,  param_iter1[4,1], param_iter1[4,2], param_iter1[4,3], param_iter1[4,4], param_iter1[4,5]),
+      c(10,  param_iter1[5,1], param_iter1[5,2], param_iter1[5,3], param_iter1[5,4], param_iter1[5,5]),
+      c(15,  param_iter1[6,1], param_iter1[6,2], param_iter1[6,3], param_iter1[6,4], param_iter1[6,5]),
+      c(20,  param_iter1[7,1], param_iter1[7,2], param_iter1[7,3], param_iter1[7,4], param_iter1[7,5]),
+      c(25,  param_iter1[8,1], param_iter1[8,2], param_iter1[8,3], param_iter1[8,4], param_iter1[8,5]),
+      c('Final',  round(est1[1], 5), round(est1[2], 5), round(est1[3], 5), round(est1[4], 5), round(est1[5], 5))),
+col.names=c('Iteration k', '$\\pi_k$', '$\\mu_{1,k}$', '$\\mu_{2,k}$', '$\\sigma_{1,k}^2$', '$\\sigma_{2,k}^2$'),
+caption="EM Iterations 1",
+digits=c(NULL, 5, 5, 5, 5)
+  )
+
+param_iter2 <- round(output2[[2]], 5)
+
+knitr::kable(
+rbind(c('Initial', round(init_2[1], 5), round(init_2[2], 5), round(init_2[3], 5), round(init_2[4], 5), round(init_2[5], 5)),
+      c(1, param_iter2[1], param_iter2[2], param_iter2[3], param_iter2[4], param_iter2[5]),
+      c(2,  param_iter2[2,1], param_iter2[2,2], param_iter2[2,3], param_iter2[2,4], param_iter2[2,5]),
+      c(3,  param_iter2[3,1], param_iter2[3,2], param_iter2[3,3], param_iter2[3,4], param_iter2[3,5]),
+      c(5,  param_iter2[4,1], param_iter2[4,2], param_iter2[4,3], param_iter2[4,4], param_iter2[4,5]),
+      c(10,  param_iter2[5,1], param_iter2[5,2], param_iter2[5,3], param_iter2[5,4], param_iter2[5,5]),
+      c(15,  param_iter2[6,1], param_iter2[6,2], param_iter2[6,3], param_iter2[6,4], param_iter2[6,5]),
+      c(20,  param_iter2[7,1], param_iter2[7,2], param_iter2[7,3], param_iter2[7,4], param_iter2[7,5]),
+      c(25,  param_iter2[8,1], param_iter2[8,2], param_iter2[8,3], param_iter2[8,4], param_iter2[8,5]),
+      c('Final',  round(est2[1], 5), round(est2[2], 5), round(est2[3], 5), round(est2[4], 5), round(est2[5], 5))),
+col.names=c('Iteration k', '$\\pi_k$', '$\\mu_{1,k}$', '$\\mu_{2,k}$', '$\\sigma_{1,k}^2$', '$\\sigma_{2,k}^2$'),
+caption="EM Iterations 2",
+digits=5
+  )
+
+param_iter3 <- round(output3[[2]], 5)
+
+knitr::kable(
+rbind(c('Initial', round(init_3[1], 5), round(init_3[2], 5), round(init_3[3], 5), round(init_3[4], 5), round(init_3[5], 5)),
+      c(1, param_iter3[1], param_iter3[2], param_iter3[3], param_iter3[4], param_iter3[5]),
+      c(2,  param_iter3[2,1], param_iter3[2,2], param_iter3[2,3], param_iter3[2,4], param_iter3[2,5]),
+      c(3,  param_iter3[3,1], param_iter3[3,2], param_iter3[3,3], param_iter3[3,4], param_iter3[3,5]),
+      c(5,  param_iter3[4,1], param_iter3[4,2], param_iter3[4,3], param_iter3[4,4], param_iter3[4,5]),
+      c(10,  param_iter3[5,1], param_iter3[5,2], param_iter3[5,3], param_iter3[5,4], param_iter3[5,5]),
+      c(15,  param_iter3[6,1], param_iter3[6,2], param_iter3[6,3], param_iter3[6,4], param_iter3[6,5]),
+      c(20,  param_iter3[7,1], param_iter3[7,2], param_iter3[7,3], param_iter3[7,4], param_iter3[7,5]),
+      c(25,  param_iter3[8,1], param_iter3[8,2], param_iter3[8,3], param_iter3[8,4], param_iter3[8,5]),
+      c('Final',  round(est3[1], 5), round(est3[2], 5), round(est3[3], 5), round(est3[4], 5), round(est3[5], 5))),
+col.names=c('Iteration k', '$\\pi_k$', '$\\mu_{1,k}$', '$\\mu_{2,k}$', '$\\sigma_{1,k}^2$', '$\\sigma_{2,k}^2$'),
+caption="EM Iterations 3",
+digits=5
+  )
+
+param_iter4 <- round(output4[[2]], 5)
+
+knitr::kable(
+rbind(c('Initial', round(init_4[1], 5), round(init_4[2], 5), round(init_4[3], 5), round(init_4[4], 5), round(init_4[5], 5)),
+      c(1, param_iter4[1], param_iter4[2], param_iter4[3], param_iter4[4], param_iter4[5]),
+      c(2,  param_iter4[2,1], param_iter4[2,2], param_iter4[2,3], param_iter4[2,4], param_iter4[2,5]),
+      c(3,  param_iter4[3,1], param_iter4[3,2], param_iter4[3,3], param_iter4[3,4], param_iter4[3,5]),
+      c(5,  param_iter4[4,1], param_iter4[4,2], param_iter4[4,3], param_iter4[4,4], param_iter4[4,5]),
+      c(10,  param_iter4[5,1], param_iter4[5,2], param_iter4[5,3], param_iter4[5,4], param_iter4[5,5]),
+      c(15,  param_iter4[6,1], param_iter4[6,2], param_iter4[6,3], param_iter4[6,4], param_iter4[6,5]),
+      c(20,  param_iter4[7,1], param_iter4[7,2], param_iter4[7,3], param_iter4[7,4], param_iter4[7,5]),
+      c(25,  param_iter4[8,1], param_iter4[8,2], param_iter4[8,3], param_iter4[8,4], param_iter4[8,5]),
+      c('Final',  round(est4[1], 5), round(est4[2], 5), round(est4[3], 5), round(est4[4], 5), round(est4[5], 5))),
+col.names=c('Iteration k', '$\\pi_k$', '$\\mu_{1,k}$', '$\\mu_{2,k}$', '$\\sigma_{1,k}^2$', '$\\sigma_{2,k}^2$'),
+caption="EM Iterations 4",
+digits=5
+  )
+```
+
+#### d)
+```{r}
+x <- seq(40, 100, 1)
+hist(faithful$waiting, freq=FALSE, ylim=c(0.00, 0.05), 
+     main='Histogram with Superimposed Density from EM', xlab='minutes')
+lines(x, sapply(x, function(z) l_obs(est1[1], est1[2], est1[3], est1[4], est1[5], z)))
+```
+The MLE found by the EM using the first initial point results in a mixture density the resmebles the data closely. The smaller mode is less than ideal but the larger mode seems to be captured well.
+

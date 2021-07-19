@@ -1,0 +1,91 @@
+---
+title: "Assignment 3"
+author: "Branden Lee"
+date: "4/16/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 3
+
+#### a)
+```{r}
+beta <- 0.1
+
+x <- c(-4.2, -2.85, -2.3, -1.02, 0.7, 0.98, 2.72, 3.5)
+
+n <- length(x)
+
+log_likelihood <- function(alpha) n * (log(beta) - log(pi)) - 
+  sum(sapply(x, function(x) log(beta^2 + (x - alpha)^2)))
+
+xrange <- seq(-5, 5, by=.01)
+plot(xrange, sapply(xrange, log_likelihood), type='l', xlab=expression(alpha),
+     ylab='log-likelihood', main='Log-likelihood')
+```
+
+#### b)
+```{r}
+set.seed(0)
+
+# Some initial values
+alpha1 <- -2.5
+alpha2 <- 0
+alpha3 <- -0.30875
+
+# Implementation for simulated annealing using a normal distribution as the proposal
+# with standard deviation 1 and a geometric temperature ladder consisting of 10 ^ 6
+# temperatures.
+simulated_annealing <- function(alpha) {
+  n = 10 ^ 5
+  T_f <- 10 ^ -6
+  T_0 <- 10
+  T <- function(i) T_0 * (T_f / T_0) ^ (i / n)
+
+  obs <- c()
+  for (i in 0:n) {
+    alpha_new <- rnorm(1, mean=alpha)
+    r <- exp((log_likelihood(alpha_new) - log_likelihood(alpha)) / T(i))
+
+    if (r >= 1 || runif(1) <= r) {
+      alpha <- alpha_new
+      }
+    obs <- c(obs, alpha)
+  }
+  return(obs)
+}
+output1 <- simulated_annealing(alpha1)
+output2 <- simulated_annealing(alpha2)
+output3 <- simulated_annealing(alpha3)
+
+sol1 <- output1[length(output1)]
+sol2 <- output2[length(output2)]
+sol3 <- output3[length(output3)]
+```
+The temperature ladder used starts from $T_0=10$, ending at $T_f=10^{-6}$ and the $i^{th}$ temperature $T_i = T_0\left(\frac{T_f}{T_0}\right)^{i/10^5}$ for $i=0,...,10^5$. We can see based on the time series plots that the algorithm converges to the solution in a relatively small number of iterations in comparison to the total number of iterations, and remains virtually stationary for the remaining time. Among the initial values tried, the algorithm converges to virtually the same solution
+
+```{r, echo=FALSE}
+knitr::kable(
+rbind(c('-2.5', round(sol1,5)),
+      c('0', round(sol2,5)),
+      c('-0.30875', round(sol3,5))),
+col.names=c('Initial Value', 'MLE'),
+caption="Simulated Annealing",
+digits=5
+  )
+
+plot(x=1:length(output1), y=output1, type='l', ylab=expression(alpha), xlab='i',
+     main=expression(paste('Time Series Plot for Simulated Annealing ', alpha[0],
+                           '=-2.5')))
+plot(x=1:length(output2), y=output2, type='l', ylab=expression(alpha), xlab='i',
+     main=expression(paste('Time Series Plot for for Simulated Annealing ', alpha[0],
+                           '=0')))
+plot(x=1:length(output3), y=output3, type='l', ylab=expression(alpha), xlab='i',
+     main=expression(paste('Time Series Plot for Simulated Annealing ', alpha[0],
+                           '=-0.30875')))
+```

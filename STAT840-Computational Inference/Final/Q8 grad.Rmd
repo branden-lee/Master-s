@@ -1,0 +1,37 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### e)
+Assuming the mixture density satisfies certain regularity conditions (?), the observed information $i_{obs}$ can be expressed as
+$$i_{obs}=-\left(\frac{\partial^2}{\partial \eta^2}Q(\eta;\theta) + \frac{\partial^2}{\partial\theta\partial\eta}Q(\eta;\theta)\right)$$
+where
+$$Q(\eta;\theta)=E_{mis|obs;\theta}(\ell_{com}(\theta;Y_{com})|y_{obs})$$
+and the variance of the estimates can be estimated by the diagonal elements of
+$$\widehat{Var}(\hat\theta)=(i_{obs}(\hat\theta))^{-1}$$
+We have from part b
+$$\frac{\partial Q}{\partial \pi_{\eta}}=\sum_{i=1}\frac{w_i}{\pi_\eta}-\frac{1-w_i}{1-\pi_\eta}$$
+$$\frac{\partial Q}{\partial \mu_{1\eta}} = \sum_{i=1}^n w_i\left(\frac{x_i-\mu_{1\eta}}{\sigma_{1\eta}^2}\right)$$
+$$\frac{\partial Q}{\partial \mu_{2\eta}} = \sum_{i=1}^n (1-w_i)\left(\frac{x_i-\mu_{2\eta}}{\sigma_{2\eta}^2}\right)$$
+$$\frac{\partial Q}{\partial \mu_{1\eta}} = \sum_{i=1}^n w_i\left(-\frac{1}{2\sigma_{1\eta}^2}+\frac{(x_i-\mu_{1\eta})^2}{2\sigma_{1\eta}^4}\right)$$
+$$\frac{\partial Q}{\partial \mu_{1\eta}} = \sum_{i=1}^n w_i\left(-\frac{1}{2\sigma_{2\eta}^2}+\frac{(x_i-\mu_{2\eta})^2}{2\sigma_{2\eta}^4}\right)$$
+
+which results in the hessian
+$$\frac{\partial^2 Q}{\partial \eta^2} = \sum_{i=1}^n
+\begin{pmatrix}
+-\frac{w_i}{\pi_\eta^2}-\frac{1-w_i}{(1-\pi_\eta)^2}& 0 & 0 & 0 & 0\\
+0& -\frac{w_i}{\sigma_{1\eta}^2} & 0 & - w_i\frac{x_i-\mu_{1\eta}}{\sigma_{1\eta}^4} &0\\
+0& 0 & -\frac{1-w_i}{\sigma_{2\eta}^2}& 0&- (1-w_i)\frac{x_i-\mu_{2\eta}}{\sigma_{2\eta}^4}\\
+0&- w_i\frac{x_i-\mu_{1\eta}}{\sigma_{1\eta}^4}  & 0&  w_i\left(\frac{1}{2\sigma_{1\eta}^4}-\frac{(x_i-\mu_{1\eta})^2}{\sigma_{1\eta}^6}\right)&0\\
+0&0 &- (1-w_i)\frac{x_i-\mu_{2\eta}}{\sigma_{2\eta}^4} & 0&  (1-w_i)\left(\frac{1}{2\sigma_{2\eta}^4}-\frac{(x_i-\mu_{2\eta})^2}{\sigma_{2\eta}^6}\right)
+\end{pmatrix}$$
+
+Similarly $\frac{\partial^2 Q}{\partial \theta \partial \eta}$ can be calculated where $\theta$ are the parameters of 
+$$w_i=E_{mis|obs;\theta}(z_i) = \frac{\pi_\theta\phi_{1\theta}(x_i)}{\pi_\theta\phi_{1\theta}(x_i) + (1-\pi_\theta)\phi_{2\theta}(x_i)}$$
+....

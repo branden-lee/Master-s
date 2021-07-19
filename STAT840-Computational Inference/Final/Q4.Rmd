@@ -1,0 +1,74 @@
+---
+title: "STAT840 Final Exam"
+author: "Branden Lee"
+date: "4/26/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 4
+
+#### a)
+Denote the marginal densities of $X,Y$ by $\pi(x), \pi(y)$ respectively.  
+\begin{align}\pi(x\mid y) &= \pi(x,y)/\pi(y) \\ &\propto x^2exp(-xy^2-y^2+2y-4x) / \pi(y) \\ &\propto x^2 exp(-xy^2-4x)\\ &\sim Gamma(3, y^2+4)\end{align}
+
+\begin{align}\pi(y\mid x) &= \pi(x,y)/\pi(x) \\ &\propto x^2exp(-xy^2-y^2+2y-4x) / \pi(x) \\ &\propto exp(-xy^2-y^2+2y)\end{align}
+Note $$-xy^2-y^2+2y = -\frac{y^2-2(1+x)^{-1}y+(1+x)^{-2}}{(1+x)^{-1}}+(1+x)^{-1}=-\frac{(y-(1+x)^{-1})^2}{2(2(1+x))^{-1}}+(1+x)^{-1}$$
+So $\pi(y\mid x)\sim N((1+x)^{-1}, (2(1+x))^{-1})$  
+
+#### b)
+Algorithm outlining a Gibbs sampler for sampling from the specified distribution:  
+1) Set $n=0$ initial point $(x_n, y_n)$  
+2) Sample $x_{n+1} \sim Gamma(3, y_n^2+4)$  
+3) Sample $y_{n+1} \sim N((1+x_{n+1})^{-1},(2(1+x_{n+1}))^{-1})$  
+6) Set $n=n+1$, and go back to step 2 until the desired number of samples N is obtained  
+7) Return the sample ${v_n, ..., v_N}$  
+Note since this is a Gibbs sampler we can be certain that the stationary distribution of this chain is $\pi(x,y)$.  
+
+#### c)
+```{r}
+set.seed(0)
+
+gibbs_sampler <-  function(init, sample_size) {
+  x <- init[1]
+  y <- init[2]
+  
+  sample <- matrix(init, nrow=1)
+  
+  while (nrow(sample) < sample_size) {
+    # Sample from full conditionals
+    x <- rgamma(1, shape=3, rate=y^2+4)
+    y <- rnorm(1, mean=1/(1+x), sd=sqrt(1/(2*(1+x))))
+  
+    sample <- rbind(sample, c(x, y))
+  }
+  return(sample)
+}
+
+sample <- gibbs_sampler(c(1,0), 6000)
+```
+Looking at the time series plots for marginals, it seems that the Gibbs sampler converges well within 1000 steps i.e. quite quickly as the chain seems to stabilise beyond that point. Furthermore, the marginal relative frequencies of the last 5000 steps in the chain also appear to be converging to well behaved distributions, which further supports convergence. Various initial points were tried to see if the result varied: for the most part both time series plots and histograms of the resulting empirical distribution were very similar. The final sample used consisted of 5000 observations from the chain after discarding the first 1000.
+
+```{r echo=FALSE}
+plot(x=seq(nrow(sample)), y=sample[,1], type='l', xlab='t',
+     ylab=expression(X[t]), main='Time Series Plot of X')
+plot(x=seq(nrow(sample)), y=sample[,2], type='l', xlab='t',
+     ylab=expression(Y[t]), main='Time Series Plot of Y')
+
+x <- sample[1001:6000,1]
+y <- sample[1001:6000,2]
+hist(x, freq=FALSE, main='Marginal Empirical Density of X, Burnout Discarded')
+hist(y, freq=FALSE, main='Marginal Empirical Density of Y, Burnout Discarded')
+```
+
+### d)
+```{r}
+est <- mean(apply(sample[1001:6000,], MARGIN=1, 
+                  FUN=function(x) x[1]^2 * x[2]^3 * exp(-x[1]^2)))
+```
+We can estimate $E(X^2Y^3e^{-X^2})$ by $\frac{1}{5000}\sum_{i=1}^{5000} X_i^2Y_i^3e^{X_i^2}$, giving us $E(X^2 Y^3 e^{-X^2})\approx`r est`$.

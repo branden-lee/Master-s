@@ -1,0 +1,27 @@
+---
+title: "Untitled"
+author: "Branden Lee"
+date: "21/01/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(logistf)
+
+df <- read.csv("C:/Users/brand/OneDrive/Desktop/hunger_games.csv", header=TRUE)
+print(df)
+
+model <- glm(surv_day1 ~ female + age + volunteer + has_name, family=binomial,
+             data=df)
+summary(model)
+
+model2 <- logistf(surv_day1 ~ female + age + volunteer + has_name, family=binomial,
+             data=df)
+summary(model2)
+```

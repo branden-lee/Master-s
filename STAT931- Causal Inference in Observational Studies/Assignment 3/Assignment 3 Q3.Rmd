@@ -1,0 +1,239 @@
+---
+title: "Assignment 3"
+author: "Branden Lee 20877653"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 3
+
+```{r}
+endometria <- read.csv('endometria.csv', header=TRUE)
+explanatoryVariables <- tail(colnames(endometria), -2)
+explanatoryVariables <- explanatoryVariables[!(explanatoryVariables == 'estrogen')]
+
+generateModels <- function(baseModel, otherVariates) {
+  models <- lapply(
+  otherVariates,
+  FUN=function(x)
+  update(baseModel, as.formula(paste('.~.+',x)))
+  )
+}
+```
+
+#### a)
+It's important to note that likelihood ratio tests rely on the fact that the likelihoods are evaluated on identical datasets, so we must remove any rows that contain a missing value to avoid any issues. With that done we can compare nested models.
+
+```{r}
+explanatoryVariables <- tail(colnames(endometria), -2)
+
+models <- generateModels(glm(case~1, family=binomial, data=endometria),explanatoryVariables)
+
+modelSummaries <- sapply(
+  models,
+  FUN=function(x) {
+    summ <- summary(x)
+    return(summ$coefficients[2,1:4])
+  }
+)
+```
+```{r echo=FALSE}
+knitr::kable(
+cbind(lapply(models, FUN=function(x) x$formula), round(t(modelSummaries),7)),
+col.names=c('Model', '$\\hat{\\beta}_{new}$', '$se(\\hat{\\beta}_{new})$', '$z$', '$p_{val}$'),
+caption="Univariate Models"
+  )
+```
+Estrogen is highly significant so we next consider models that contain estrogen.
+
+```{r}
+model1 <- models[[5]] # univariate model with estrogen
+
+explanatoryVariables <- explanatoryVariables[!(explanatoryVariables == 'estrogen')]
+
+models <- generateModels(model1,explanatoryVariables)
+
+modelSummaries <- sapply(
+  models,
+  FUN=function(x) {
+    summ <- summary(x)
+    return(summ$coefficients[3,1:4])
+  }
+)
+```
+```{r echo=FALSE}
+knitr::kable(
+  cbind(lapply(models, FUN=function(x) x$formula), round(t(modelSummaries),4)),
+  col.names=c('Model', '$\\hat{\\beta}_{new}$', '$se(\\hat{\\beta}_{new})$', '$z$', '$p_{val}$'),
+  caption="Main Effects Models including Estrogen"
+)
+```
+Gall-bladder disease is the next most statistically significant when added among all variables, although is relatively not very significant. It will be fruitful to further investigate the inclusion of other variables although at this moment the model with just estrogen looks to be the best model. First, to confirm that the model with estrogen and gall has not affected the significance of estrogen:
+
+```{r echo=FALSE}
+summary(models[[2]])$coefficients
+```
+
+```{r}
+model2 <- models[[2]]
+
+explanatoryVariables <- append(explanatoryVariables[!(explanatoryVariables=='gall')], 
+                               'estrogen*gall')
+models <- generateModels(model2,explanatoryVariables)
+
+modelSummaries <- sapply(
+  models,
+  FUN=function(x) {
+    summ <- summary(x)
+    return(summ$coefficients[4,1:4])
+  }
+)
+```
+```{r echo=FALSE}
+knitr::kable(
+  cbind(lapply(models, FUN=function(x) x$formula), round(t(modelSummaries),4)),
+  col.names=c('Model', '$\\hat{\\beta}_{new}$', '$se(\\hat{\\beta}_{new})$', '$z$', '$p_{val}$'),
+  caption="Models including Estrogen and Gall-Bladder Disease"
+)
+```
+The coefficients for the interaction model with both estrogen and gall bladder disease are all statistically significant. We can confirm that all variables in this model are statistically significant:
+
+```{r echo=FALSE}
+summary(models[[5]])$coefficients
+```
+This model is best model so far for two reasons: a) all variables are statistically significant and b) it contains both risk factors of interest. We will proceed with another iteration of forward selection to determine whether any other risk factors should be included in the model:
+
+```{r}
+model3 <- models[[5]]
+
+explanatoryVariables <- explanatoryVariables[!(explanatoryVariables=='estrogen*gall')]
+
+models <- generateModels(model3,explanatoryVariables)
+
+modelSummaries <- sapply(
+  models,
+  FUN=function(x) {
+    summ <- summary(x)
+    return(summ$coefficients[4,1:4])
+  }
+)
+```
+```{r echo=FALSE}
+knitr::kable(
+  cbind(lapply(models, FUN=function(x) x$formula), round(t(modelSummaries),4)),
+  col.names=c('Model', '$\\hat{\\beta}_{new}$', '$se(\\hat{\\beta}_{new})$', '$z$', '$p_{val}$'),
+  caption="Interaction Models with Additional Covariates"
+)
+```
+
+At this point, it does not seem that adding any other variables improves the fit. The results of the forward selection algorithm provided two models that fit the data well: the main effects model with just estrogen, and the interaction model with both estrogen and gall bladder disease. Scientifically, the interaction model is more useful as we are primarily interested in how both estrogen use and history of gall-bladder disease affect the risk of endometrial cancer. To assess whether the interaction provides a better fit to the data then the simpler model, we can perform a deviance test. The interaction model is
+$$log\left(\frac{\pi}{1-\pi}\right) = \beta_0+\beta_1x_1+\beta_2x_2+\beta_3x_1x_2$$
+where $\beta_1$ and $\beta_2$ correspond to estrogen and gall bladder disease respectively. The hypothesis test of interest is
+\[ H_0: \beta_2=\beta_3=0 \\ H_a: \beta_2 \neq 0 \text{ or } \beta_3 \neq 0\]
+The deviance statistic is $\Delta D\ \dot{\sim}\ \chi_2^2$ under the null hypothesis.
+\[\Delta D = `r model1$deviance - model3$deviance` > `r qchisq(.95, df=2)` = \chi_2^2(.95)\]
+We reject the null hypothesis i.e. the interaction model provides a better fit to the data than the simple model.
+
+\newpage
+
+```{r}
+## Code for part b)
+
+library(survival)
+
+explanatoryVariables <- tail(colnames(endometria), -2)
+
+models <- lapply(
+  explanatoryVariables,
+  FUN=function(x) clogit(formula(paste('case ~', x, '+ strata(gp)')), data=endometria)
+  )
+modelSummaries <- sapply(models, FUN=function(x) summary(x)$coefficients[,-2])
+
+firstModelsTable <- knitr::kable(
+  cbind(paste('case ~', explanatoryVariables, 
+              '+ strata(gp)'), round(t(modelSummaries),4)),
+  col.names=c('Model', '$\\hat{\\beta}_{new}$',
+              '$se(\\hat{\\beta}_{new})$', '$z$', '$p_{val}$'),
+  caption="Univariate Models with Matching"
+)
+
+model1 <- models[[5]]
+
+explanatoryVariables <- explanatoryVariables[!(explanatoryVariables == 'estrogen')]
+
+models <- lapply(
+  explanatoryVariables[explanatoryVariables!='estrogen'],
+  FUN=function(x) 
+    clogit(formula(paste('case~estrogen+', x, '+strata(gp)')), data=endometria)
+  )
+
+modelSummaries <- sapply(models, FUN=function(x) summary(x)$coefficients[2,-2])
+
+secondModelsTable <- knitr::kable(
+  cbind(paste('case ~ estrogen +', explanatoryVariables, '+ strata(gp)'),
+        round(t(modelSummaries),4)),
+  col.names=c('Model', '$\\hat{\\beta}_{new}$', 
+              '$se(\\hat{\\beta}_{new})$', '$z$', '$p_{val}$'),
+  caption="Main Effects Models including Estrogen with Matching"
+)
+
+model2 <- clogit(formula(paste('case~estrogen+gall+estrogen*gall', '+strata(gp)')),
+                 data=endometria)
+
+model1
+model2
+```
+\newpage
+#### b)
+
+  To investigate potential risk factors of endometrial cancer, several models were fitted to the data and then compared based on both quantitative measures such as $p$-values as well as the qualitative nature of the information captured in the model. In particular, since we are especially interested in the associations of estrogen use and history of gall-bladder disease, special attention was paid to models that contain one or both of these risk factors.
+  
+  An initial variable selection was performed using forward selection with a fairly relaxed significance level of 0.15. The model chosen by the forward selection is the one with just estrogen as an explanatory variable. Tables 5 and 6 below show summaries including estimates, standard errors, $z$-statistics and $p$-values of coefficients for all models fitted in each step of the model selection algorithm. Based on these results, it is clear that the model with just estrogen is preferred over the main effects model with both estrogen and gall-bladder disease. For the sake of completeness, an interaction model with both estrogen and gall-bladder disease was also fitted. In comparison to the main effects model with these two risk factors, gall-bladder disease is more statisically significant in the interaction model than in the main effects model. However, both this term and the interaction term are individually not significant at the 95% level, and using a likelihood ratio test we can test whether the interaction model is better than the one with just estrogen:
+  
+\[\Delta D = 28.35 - 24.45 = 3.90< `r qchisq(.95, df=2)` = \chi^2_2(.95)\]
+
+The data suggests that the model with just estrogen is better than the interaction model. Since no other risk factors were identified in the forward selection, estrogen seems to be the dominant risk factor among all risk factors that were included in the study. The odds of someone who uses estrogen getting endometrial cancer is 9.6667 times that of someone who does not use estrogen.
+
+```{r echo=FALSE}
+firstModelsTable
+secondModelsTable
+```
+
+\newpage
+#### c)
+In the unmatched analysis, the conclusion was that the interaction model with both estrogen and gall-bladder disease provided the fit to the data, while the model with just estrogen was better after matching. Based on the estimates in the unmatched analysis, a history of gall-bladder disease as well as use of estrogen leads to a much higher odds of endometrial cancer versus only one of these risk factors. We can interpret the results of the matched analysis as suggesting that for subjects whose matching variables agree, the odds of endometrial cancer increases with estrogen use. The matching thus explains some of the association between gall-bladder disease and endometrial cancer.
+
+#### d)
+To estimate the probability of missing obesity information, we can fit one parameter logistic regression models with the response being an indicator for missing obesity information and the other covariates besides $gp$ as explanatory variables. Based on this model, use of non-estrogen drugs seems to have the strongest association with missing obesity information. The estimate of the coefficient associated to this risk factor suggests that subjects who use non-estrogen drugs are more likely to have obesity information missing than those who don't. Since our analysis merely ignored the missing data, it's possible that this affected our ability to more accurately determine the effect non-estrogen drug use has on the risk of endometrial cancer. There is also a strong association between estrogen and missing obesity information which leads to a similar conclusion.
+
+```{r}
+## Code for part d)
+endometria$obeseMissing <- ifelse(is.na(endometria$obese), 1, 0)
+
+models <- lapply(
+    c('case', 'gall', 'hyper', 'estrogen', 'drugs'),
+  FUN=function(x) glm(formula(paste('obeseMissing ~ ', x)),
+                      family=binomial, data=endometria))
+
+modelSummaries <- sapply(
+  models,
+  FUN=function(x) {
+    summ <- summary(x)
+    return(summ$coefficients[2,1:4])
+  }
+)
+```
+```{r echo=FALSE}
+knitr::kable(
+cbind(lapply(models, FUN=function(x) x$formula), round(t(modelSummaries),7)),
+col.names=c('Model', '$\\hat{\\beta}_{new}$', '$se(\\hat{\\beta}_{new})$', '$z$', '$p_{val}$'),
+caption="Univariate Models for Missing Obesity Information"
+  )
+```

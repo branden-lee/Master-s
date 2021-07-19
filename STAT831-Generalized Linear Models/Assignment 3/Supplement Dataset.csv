@@ -1,0 +1,31 @@
+Province,Sex,Cancer,Count,Population
+Ontario,Male,Lung,3600,7184724
+Ontario,Male,Colorectal,1650,7184724
+Ontario,Male,Breast,20,7184724
+Ontario,Male,Prostate,1500,7184724
+Ontario,Male,Pancreas,1000,7184724
+Ontario,Female,Lung,3300,7359994
+Ontario,Female,Colorectal,1500,7359994
+Ontario,Female,Breast,1900,7359994
+Ontario,Female,Prostate,0,7359994
+Ontario,Female,Pancreas,960,7359994
+Newfoundland and Labrador,Male,Lung,250,258914
+Newfoundland and Labrador,Male,Colorectal,150,258914
+Newfoundland and Labrador,Male,Breast,0,258914
+Newfoundland and Labrador,Male,Prostate,80,258914
+Newfoundland and Labrador,Male,Pancreas,45,258914
+Newfoundland and Labrador,Female,Lung,170,264562
+Newfoundland and Labrador,Female,Colorectal,120,264562
+Newfoundland and Labrador,Female,Breast,95,264562
+Newfoundland and Labrador,Female,Prostate,0,264562
+Newfoundland and Labrador,Female,Pancreas,35,264562
+Alberta,Male,Lung,840,2194256
+Alberta,Male,Colorectal,450,2194256
+Alberta,Male,Breast,5,2194256
+Alberta,Male,Prostate,430,2194256
+Alberta,Male,Pancreas,230,2194256
+Alberta,Female,Lung,870,2167438
+Alberta,Female,Colorectal,330,2167438
+Alberta,Female,Breast,470,2167438
+Alberta,Female,Prostate,0,2167438
+Alberta,Female,Pancreas,240,2167438

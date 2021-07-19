@@ -1,0 +1,117 @@
+---
+title: "Assignment 3"
+author: "Branden Lee"
+date: "4/16/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 2
+
+#### a)
+```{r}
+X <- c(53,57,58,63,66,67,67,67,68,69,70,70,70,70,72,73,75,75,76,76,78,79,82)
+y <- c(2,1,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,2,0,0,0,0,0)
+
+p <- function(x, alpha, beta) {
+  exp(alpha + beta * x) / (1 + exp(alpha + beta * x))
+}
+
+log_likelihood <- function(alpha, beta) {
+  sum(y * (alpha + beta * X) - 6 * log(1 + exp(alpha + beta * X)))
+}
+
+score_alpha <- function(alpha, beta) {
+  sum(y - 6 * p(X, alpha, beta))
+}
+
+score_beta <- function(alpha, beta) {
+  sum(X * (y - 6 * p(X, alpha, beta)))
+}
+```
+
+Note  
+$$P(Y_i=y_i\mid x_i)={6\choose y_i}p(x_i)^{y_i}(1-p(x_i))^{6-y_i} = {6\choose y_i}\left(\frac{e^{\alpha+\beta x_i}}{1+e^{\alpha+\beta x_i}}\right)^{y_i}\left(\frac{1}{1+e^{\alpha+\beta x_i}}\right)^{6-y_i}$$ 
+So  
+$$\ell(\alpha, \beta \mid y)=log\left(\prod_{i=1}^n P(Y_i\mid x_i)\right) =\sum_{i=1}^n log{6 \choose y_i} + y_i(\alpha+\beta x_i) - 6\ log(1+e^{\alpha+\beta x_i})$$
+from which it follows  
+$$S(\alpha, \beta) = \left( \sum_{i=1}^n \left(y_i - 6\frac{e^{\alpha+\beta x_i}}{1+e^{\alpha+\beta x_i}}\right), \quad\sum_{i=1}^n x_i\left(y_i - 6\frac{e^{\alpha+\beta x_i}}{1+e^{\alpha+\beta x_i}}\right)\right)$$
+
+```{r, echo=FALSE}
+a <- seq(-10, 10, length=21)
+b <- seq(-.3, .3, length=21)
+ll <- outer(a, b, Vectorize(log_likelihood))
+s_alpha <- outer(a, b, Vectorize(score_alpha))
+s_beta <- outer(a, b, Vectorize(score_beta))
+persp(a, b, ll, theta=90, phi=35, xlab='alpha', ylab='beta', zlab='log-likelihood', ticktype='detailed', cex.axis=.7, cex.lab=.8, main='Log-likelihood')
+persp(a, b, s_alpha, theta=90, phi=35, xlab='alpha', ylab='beta', zlab='Score', ticktype='detailed', cex.axis=.7, cex.lab=.8, main='Score (alpha)')
+persp(a, b, s_beta, theta=90, phi=35, xlab='alpha', ylab='beta', zlab='Score', ticktype='detailed', cex.axis=.7, cex.lab=.8, main='Score (beta)')
+```
+
+
+#### b)
+```{r}
+optim(c(0,0), function(x) -log_likelihood(x[1], x[2]), method='Nelder-Mead')
+optim(c(2,2), function(x) -log_likelihood(x[1], x[2]), method='Nelder-Mead')
+optim(c(-3,3), function(x) -log_likelihood(x[1], x[2]), method='Nelder-Mead')
+optim(c(-3,-2), function(x) -log_likelihood(x[1], x[2]), method='Nelder-Mead')
+optim(c(1.4,-1), function(x) -log_likelihood(x[1], x[2]), method='Nelder-Mead')
+```
+Since the optim function in R searches for minimums, the function we want to optimize is the negative log-likelihood.
+
+
+#### c)
+```{r}
+information <- function(alpha, beta) {
+  daa <- sum(p(X, alpha, beta) / (1 + exp(alpha + beta * X)))
+  dab <- sum(X * p(X, alpha, beta) / (1 + exp(alpha + beta * X)))
+  dbb <- sum(X ^ 2 * p(X, alpha, beta) / (1 + exp(alpha + beta * X)))
+  return(- 6 * matrix(c(daa, dab, dab, dbb), nrow=2))
+}
+
+NR <- function(theta0, delta, epsilon) {
+  theta <- theta0
+  s <- solve(-information(theta[1], theta[2]), c(score_alpha(theta[1], theta[2]),
+                                                 score_beta(theta[1], theta[2])))
+  while (abs(s %*% s) >= delta || abs(log_likelihood(theta[1], theta[2]) -
+  log_likelihood((theta + s)[1], (theta + s)[2])) >= epsilon) {
+    theta <- theta + s
+    s <- solve(-information(theta[1], theta[2]), c(score_alpha(theta[1], theta[2]),
+                                                   score_beta(theta[1], theta[2])))
+  }
+  theta
+}
+NR(c(0,0), .001, .01)
+NR(c(-.01, -.01), .001, .01)
+NR(c(-.05, .02), .001, .01)
+NR(c(.03, -.03), .001, .01)
+
+# other values tried that resulted in error
+# NR(c(2,2), .0001)
+# NR(c(-3,3), .0001)
+# NR(c(-3,-2), .0001)
+# NR(c(0.5, -1), .0001)
+# NR(c(-1, 1), .0001)
+```
+Note the Hessian of the negative log-likelihood is  
+$H(\alpha,\beta) = \begin{pmatrix} -6\sum_{i=1}^n \frac{e^{\alpha+\beta x_i}}{(1+e^{\alpha+\beta x_i})^2} & -6 \sum_{i=1}^n x_i \frac{e^{\alpha+\beta x_i}}{(1+e^{\alpha+\beta x_i})^2}\\ -6\sum_{i=1}^n x_i\frac{e^{\alpha+\beta x_i}}{(1+e^{\alpha+\beta x_i})^2} & -6\sum_{i=1}^n x_i^2 \frac{e^{\alpha+\beta x_i}}{(1+e^{\alpha+\beta x_i})^2} \end{pmatrix}$  
+After each iteration, the following conditions are checked: $$\left|\theta_{n+1}-\theta_n\right|<\delta$$ $$\left|\ell(\theta_{n+1})-\ell(\theta_n)\right|<\epsilon$$
+where $\theta=(\alpha,\beta)$ and $\delta, \epsilon$ are prespecified thresholds provided as input to the function: if both are true then the algorithm terminates and returns $\theta_{n+1}$. Of the values that were tried that resulted in a solution, the MLEs were very similar to the ones found in the other parts of this question (except for one). Other initial values were tried to see if the algorithm converges to roughly the same solution: in fact, of the initial values tried the algorithm could run only when the number was extremely close to (0,0). I believe this is due to the scale of the likelihood function causing issues with floating point arithmetic.
+
+#### d)
+The observed information is constant with respect to $Y_i$ i.e. Fisher scoring is equivalent to Newton-Raphson, so the results in part c) also hold for Fisher scoring.
+
+#### e)
+```{r}
+optim(c(0,0), function(x) -log_likelihood(x[1], x[2]), method='BFGS')
+optim(c(2,2), function(x) -log_likelihood(x[1], x[2]), method='BFGS')
+optim(c(-3,3), function(x) -log_likelihood(x[1], x[2]), method='BFGS')
+optim(c(-3,-2), function(x) -log_likelihood(x[1], x[2]), method='BFGS')
+optim(c(1.4,-1), function(x) -log_likelihood(x[1], x[2]), method='BFGS')
+```
+These results for the most part agree with those found in previous parts

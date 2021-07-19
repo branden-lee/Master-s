@@ -1,0 +1,73 @@
+---
+title: "Assignment 4"
+author: "Branden Lee 20877653"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pscl)
+```
+
+### Question 2
+
+#### (a)
+By the law of total probability,
+\begin{align*}
+P(Y_i=0) &= P(Y_i=0|Y_i \text{ necessarily } 0)\cdot P(Y_i \text{ necessarily } 0) + \\
+& \qquad P(Y_i=0|Y_i \text{ not necessarily } 0)\cdot P(Y_i \text{ not necessarily } 0)\\
+&= 1\cdot \pi_i + \frac{e^{-\mu_i} \mu_i^0}{0!}\cdot (1-\pi_i)\\
+&= \pi_i + (1-\pi_i) e^{-\mu_i} \\
+\end{align*}
+For $y_i>0$,
+$P(Y_i=y_i) = P(Y_i=y_i|Y_i \text{ not necessarily } 0)\cdot P(Y_i \text{ not necessarily } 0) = \frac{e^{-\mu_i} \mu_i^{y_i}}{y_i!} \cdot (1-\pi_i)$
+
+#### (b)
+\begin{align*}
+E(Y_i) &= \sum_{y_i=0}^\infty y_iP(Y_i=y_i)\\
+&= 0\cdot (\pi_i+(1-\pi_i)e^{-\mu_i})+\sum_{y_i=1}^\infty y_i\frac{e^{-\mu_i} \mu_i^{y_i}}{y_i!} \cdot (1-\pi_i)\\
+&= (1-\pi_i)\sum_{y_i=0}^\infty y_i\frac{e^{-\mu_i} \mu_i^{y_i}}{y_i!}\\
+&= (1-\pi_i) \mu_i\\
+E(Y_i^2) &= \sum_{y_i=0}^\infty y_i^2P(Y_i=y_i)\\
+&= 0^2\cdot (\pi_i+(1-\pi_i)e^{-\mu_i})+\sum_{y_i=1}^\infty y_i^2\frac{e^{-\mu_i} \mu_i^{y_i}}{y_i!} \cdot (1-\pi_i)\\
+&= (1-\pi_i)E(Y_i^2|Y_i \text{ not necessarily } 0)\\
+&= (1-\pi_i)(Var(Y_i|Y_i \text{ not necessarily } 0)+E(Y_i|Y_i \text{ not necessarily } 0)^2)\\
+&= (1-\pi_i)(\mu_i+\mu_i^2)\\
+\implies Var(Y_i)&=(1-\pi_i)(\mu_i+\mu_i^2)-(1-\pi_i)^2\mu_i^2\\
+&= (1-\pi_i)\mu_i(1+\mu_i-(1-\pi_i)\mu_i)\\
+&= (1-\pi_i)\mu_i(1+\pi_i\mu_i)
+\end{align*}
+If $\pi_i>0$ then $Var(Y_i)/E(Y_i)=[(1-\pi_i)\mu_i(1+\pi_i\mu_i)]/[(1-\pi_i) \mu_i]=1+\pi_i\mu_i>1$ since $\mu_i>0$ i.e. $Var(Y_i)>E(Y_i)$.
+
+#### (c)
+\begin{align*}
+P(Y_i=y_i)&=(\pi_i+(1-\pi_i)e^{-\mu_i})^{I(y_i=0)} \left(\frac{e^{-\mu_i} \mu_i^{y_i}}{y_i!}(1-\pi_i)\right)^{I(y_i>0)}&&\\
+&=\left(\frac{e^{z_i^t\gamma}}{1+e^{z_i^t\gamma}}+\left(1-\frac{e^{z_i^t\gamma}}{1+e^{z_i^t\gamma}}\right)e^{-e^{x_i^t\beta}}\right)^{I(y_i=0)} \left(\frac{e^{-e^{x_i^t\beta}} e^{y_ix_i^t\beta }}{y_i!}\left(1-\frac{e^{z_i^t\gamma}}{1+e^{z_i^t\gamma}}\right)\right)^{I(y_i>0)}\\
+\ell_i(\gamma, \omega)&= I(y_i=0)[log(e^{z_i^t\gamma}+e^{-e^{x_i^t\beta}})-log(1+e^{z_i^t\gamma})] + I(y_i>0)[y_ix_i^t\beta-e^{x_i^t\beta}-log(y!)-log(1+e^{z_i^t\gamma})]\\
+&=I(y_i=0)log(e^{z_i^t\gamma}+e^{-e^{x_i^t\beta}}) + I(y_i>0)[y_ix_i^t\beta-e^{x_i^t\beta}-log(y!)]-log(1+e^{z_i^t\gamma})\\
+\end{align*}
+
+
+#### (d)
+```{r}
+data(bioChemists)
+
+hist(bioChemists$art, prob=TRUE, breaks=20, xlab='Count',
+     ylab='Relative Frequency', main='Relative Frequency of Articles Produced')
+points(dpois(0:20, lambda=mean(bioChemists$art)))
+```
+Comparing the relative frequencies of the observed data with the pmf of a Poisson with parameter the sample mean of the data, there seem to be a larger number of student with 0 articles than should be expected by a Poisson model.
+
+#### (e)
+```{r}
+myZIP <- zeroinfl(art~fem+mar+kid5+ment|ment, data = bioChemists)
+summary(myZIP)
+```
+The estimate of the intercept in the poisson part of the model is 0.60947, and can be interpreted as the log expected rate of articles produced by a single male student in the last 3 years of their phd  who don't have children under 5 and whose phd mentor has not produced any articles in the last three years given the student has been able to produce an article.
+The estimate of the mar variable in the poisson part of the model is 0.13484, and can be interpreted as the log relative rate of articles produced by a married student vs a non-married student that are the same gender, have the same number of children under 5 and whose phd mentors have produced the same number of articles in the last three years given the students have been able to produce an article.
+The estimate of the intercept in the logistic part of the model is -0.68568, and can be interpreted as the log odds of a student whose phd mentor has produced no articles in the last three years being able to produce an article in the last 3 years of their phd.
+The estimate of the ment variable in the logistic part of the model is -0.13007 and can be interpreted as the log odds ratio of a student whose phd mentor has produced $k$ articles in the last 3 years being able to produce an article in the last 3 years of their phd versus a student whose phd mentor has produced $k-1$ articles in the last 3 years.

@@ -1,0 +1,204 @@
+---
+title: "Assignment 4"
+author: "Branden Lee"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(latex2exp)
+library(ggplot2)
+library(gridExtra)
+library(Matching)
+source('stddiff.R')
+```
+
+### Question 2
+
+#### (1)
+```{r}
+# Create dataset and create factor variables
+smoking <- read.csv('nhefs2.csv', header=TRUE)
+smoking$sexf <- factor(smoking$sex)
+smoking$racef <- factor(smoking$race)
+smoking$educationf <- factor(smoking$education)
+smoking$activef <- factor(smoking$active)
+smoking$exercisef <- factor(smoking$exercise)
+
+
+# Propensity score model
+psModel <- glm(qsmk~sexf + age + racef + educationf + smokeintensity + smokeyrs + 
+                 activef + exercisef + wt71 + I(age^2) + I(smokeintensity^2) +
+                 I(smokeyrs^2) + I(wt71^2), 
+               family=binomial,
+               data=smoking)
+
+
+# Estimate propensity scores
+smoking$ps <- predict(psModel, type='response')
+
+
+# Plot histograms of frequencies of propensity scores for treated and control
+# observations respectively.
+plot1 <- ggplot(smoking[smoking$qsmk==0,], aes(x=ps)) + 
+  stat_bin(bins=25) +
+  labs(x=TeX('$\\hat{ps}(X)$'), x='Frequency',
+       title='Histogram of Propensity Scores for Control Observations') + 
+  scale_x_continuous(limits=c(0,1), expand=c(0,0)) +
+  scale_y_continuous(limits=c(0,220), expand=c(0,0))
+plot2 <- ggplot(smoking[smoking$qsmk==1,], aes(x=ps)) + 
+  stat_bin(bins=25) +
+  labs(x=TeX('$\\hat{ps}(X)$'), y='Frequency',
+       title='Histogram of Propensity Scores for Treated Observations') + 
+  scale_x_continuous(limits=c(0,1), expand=c(0,0)) +
+  scale_y_continuous(limits=c(0,70), expand=c(0,0))
+grid.arrange(plot1,plot2,nrow=2)
+```
+The overlap of the sampling distributions looks quite good. The only potential issue may be that the tails seem to differ slightly. The distribution of the propensity score for the treatment group is more right skewed in comparison to that of the control group, leading to performing analysis by matching propensity scores, this may result in poorer matches for observations with more extreme propensity scores, however the differences don't seem to be extreme enough as based on the plots it seems reasonable to expect that reasonable matching distances (~0.2) can be attained for such observations.
+
+\newpage
+#### (2)
+```{r}
+# Obtain weights for treated observations.
+adjustedTreatmentWeights <- function(.df) {
+  w <- .df[smoking$qsk==1]
+    ifelse(w>20, 20, w)
+}
+
+
+# Obtain IPW estimate of average causal effect using data set .df.
+estimateACEIPW <- function(.df) {
+  sum(.df$qsmk * .df$wt82_71 / .df$ps) /  sum(1 / .df[.df$qsmk==1, 'ps']) -
+  sum((1 - .df$qsmk) * .df$wt82_71 / (1 - .df$ps)) / sum(1 / (1 - .df[.df$qsmk==0, 'ps']))
+}
+
+
+# IPW ACE estimator
+aceIPW <- estimateACEIPW(smoking)
+
+
+# Bootstrap standard ematchingor
+bootstrapACE <- rep(NA, 1000)
+for (i in 1:1000) {
+  # Sample with replacement from row numbers to generate bootstrap samples
+  select=sample(1:length(smoking$qsmk), size=length(smoking$qsmk),replace=TRUE)
+  
+  # Bootstrap sample
+  ndata <- smoking[select,]
+  
+  # Propensity scores
+  ndata$ps <- predict(glm(qsmk~sexf + age + racef + educationf + smokeintensity +
+                            smokeyrs + activef + exercisef + wt71 + I(age^2) + 
+                            I(smokeintensity^2) + I(smokeyrs^2) + I(wt71^2), 
+                          family=binomial,
+                          data=ndata), type='response')
+  
+  bootstrapACE[i] <- estimateACEIPW(ndata)
+}
+
+ciIPW <- aceIPW + c(-1, 1) * qnorm(.975) * sd(bootstrapACE)
+```
+The estimated average causal effect of smoking cessation on weight gain using inverse probability weighting is `r aceIPW` wiht a 95% confidence interval of `r ciIPW`.
+
+\newpage
+#### (3)
+```{r}
+# Perform 1-3 matching with replacement and calipers of size 0.2.
+matching <- Match(Y=smoking$wt82_71, Tr=smoking$qsmk, X=smoking$ps, M=3, replace=TRUE, 
+                  caliper=.2, estimand='ATE')
+
+
+# To obtain balance statistics before and after matching
+mb <- MatchBalance(qsmk~sexf + age + racef + educationf + smokeintensity + smokeyrs + 
+               activef + exercisef + wt71 + I(age^2) + I(smokeintensity^2) + 
+               I(smokeyrs^2) + I(wt71^2), data=smoking, match.out=matching,
+             print.level=0)
+
+
+# ASMD for each covariate in propensity score model before and after matching 
+# respectively. Divide by 100 due to way it is calculated in the package.
+asmdBefore <- sapply(1:18, FUN= function(x) abs(mb$BeforeMatching[[x]]$sdiff)) / 100
+asmdAfter <- sapply(1:18, FUN= function(x) abs(mb$AfterMatching[[x]]$sdiff)) / 100
+
+
+# Plotting covariate balance.
+df <- data.frame(t = c(rep('Before Matching', 18), rep('After Matching', 18)), 
+              asmd = append(asmdBefore, asmdAfter), cov = c(1:18, 1:18))
+df$t <-factor(df$t, levels=c('Before Matching', 'After Matching'))
+plot <- ggplot(df, aes(x=t, y=asmd, group=cov)) + geom_line() + geom_point() +
+  scale_y_continuous(expand=c(0,0), limits=c(0, 0.3)) +
+  labs(title='Covariate Balance Before and After Matching', y='ASMD', x='')
+```
+1 to 3 matching was done with replacement and with calipers of size 0.2. The estimated average causal effect of smoking cessation on weight gain is `r matching$est`, and a 95% confidence interval for this estimate is (`r matching$est - qnorm(.975) * matching$se`, `r matching$est + qnorm(.975) * matching$se`).
+
+Overall, the matching did a very good job balancing the covariates as shown below. The absolute standardized mean differences for all covariates included in the propensity score model are below the conservative .1 cutoff and well below the .2 cutoff. The matching significantly improved the balance for many of the unbalanced covariates.
+
+```{r echo=FALSE}
+plot
+```
+
+
+\newpage
+#### (4)
+```{r}
+predictOutcome <- function(fullData, controlOrTreated) {
+  out <- lm(wt82_71~sexf + age + racef + educationf + smokeintensity + smokeyrs +
+             activef + exercisef + wt71 +  I(age^2) + I(smokeintensity^2) + 
+             I(smokeyrs^2) + I(wt71^2), 
+            data=fullData[fullData$qsmk==controlOrTreated,])
+  predict(out, newdata=fullData)
+}
+
+estimateDR <- function(.df, o1, o0) {
+   mean((.df$qsmk * .df$wt82_71 - (.df$qsmk - .df$ps) * o1) /
+                .df$ps) - 
+  mean(((1 - .df$qsmk) * .df$wt82_71 + (.df$qsmk - .df$ps) * o0) /
+         (1 - .df$ps))
+}
+
+
+# Outcome regression for treated and control observations respectively
+m1 <- predictOutcome(smoking, 1)
+m0 <- predictOutcome(smoking, 0)
+
+
+# Double-robust estimate of average causal estimate
+aceDR <- estimateDR(smoking, m1, m0)
+
+
+# Calculate bootstrap standard deviation.
+bootstrapACE <- rep(NA, 1000)
+for (i in 1:1000) {
+  # Sample row numbers with replacement for each iteration
+  select=sample(1:length(smoking$qsmk), size=length(smoking$qsmk),replace=TRUE)
+  
+  # Bootstrap sample from original data
+  ndata <- smoking[select,]
+  
+  # Outcome regression for treated observations
+  m1n <- predictOutcome(ndata, 1)
+  
+  
+  # Outcome regression for control observations
+  m0n <- predictOutcome(ndata, 0)
+  
+  
+  # Estimate propensity scores.
+  ndata$ps <- predict(glm(qsmk~sexf + age + racef + educationf + smokeintensity + 
+                            smokeyrs + activef + exercisef + wt71 + I(age^2) + 
+                            I(smokeintensity^2) + I(smokeyrs^2) + I(wt71^2),
+                          family=binomial,
+                          data=ndata), 
+                      type='response')
+  
+  
+  bootstrapACE[i] <- estimateDR(ndata, m1n, m0n)
+}
+
+ci <- aceDR + c(-1, 1) * qnorm(.975) * sd(bootstrapACE)
+```
+The estimated average causal effect of smoking cessation on weight gain is `r aceDR` with a 95% confidence interval of (`r ci[1]`,`r ci[2]`).

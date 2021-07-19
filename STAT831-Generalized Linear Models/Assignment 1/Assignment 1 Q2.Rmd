@@ -1,0 +1,58 @@
+---
+title: "STAT831: Assignment 1"
+author: "Branden Lee 20877653"
+header-includes: \usepackage{amsmath}
+geometry: margin=2cm
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 2
+
+(a) $L(\lambda;x) = \prod_{i=1}^n f(y;\lambda) = \prod_{i=1}^n \lambda e^{-\lambda x_i} = \lambda^n exp(-\lambda \sum_{i=1}^n x_i)$
+
+    $\ell(\lambda;x) = log(\lambda^n exp(-\lambda \sum_{i=1}^n x_i)) = nlog\lambda - \lambda\sum_{i=1}^n x_i$
+
+(b) $S(\lambda) = \frac{\partial \ell}{\partial \lambda} = \frac{n}{\lambda} - \sum_{i=1}^n x_i$
+
+    $I(\lambda) = -\frac{\partial S}{\partial \lambda} = -(-\frac{n}{\lambda^2}) = \frac{n}{\lambda^2}$
+
+    Note $I(\lambda) = \frac{n}{\lambda^2} > 0$, and $S(\hat{\lambda}) = 0$ when $\hat{\lambda} = \frac{n}{\sum_{i=1}^nx_i}$.
+    Thus $\hat{\lambda}$ is the MLE of $\lambda$.
+
+(c) Under the null hypothesis $H_0: \lambda = 1$:
+\begin{align*}
+    LR: -2r(1)  & = -2(\ell(1) - \ell(\hat{\lambda}))  \\
+    & = -2((nlog(1) - 1\sum_{i=1}^n x_i) - (n log(\frac{n}{\sum_{i=1}^n x_i}) - \frac{n}{\sum_{i=1}^n x_i} \sum_{i=1}^n x_i)) \\
+    & = 2(\frac{n}{\hat{\lambda}} + n log(\hat{\lambda}) - n) \\
+    Score: S(1)^2 / I(1) & = (\frac{n}{1} - \sum_{i=1}^n x_i)^2 / \frac{n}{1} \\
+    & = n(1 - \frac{1}{\hat{\lambda}})^2 \\
+    Wald: (\hat{\lambda} - 1)^2 I(\hat{\lambda}) & = (\hat{\lambda} - 1)^2 \frac{n}{\hat{\lambda^2}} \\
+    & = n(1 - \frac{1}{\hat{\lambda}})^2
+\end{align*}
+  
+(d) As can be seen in the plots, the 3 statistics look virtually identical near the MLE, and produce similar confidence intervals for a given sample size: for this particular distribution, the Score and Wald statistics are the same (this was shown analytically in part b). The dotted horizontal line represents the quantile for the chi-squared distribution with one degree of freedom that would be used for hypothesis testing at the 95% confidence level/calculating 95% confidence interval. The plots highlight the fact that larger sample size allow for more precise inference through smaller confidence intervals/larger rejection regions for hypothesis testing since the interval over which the graphs lies under this quantile becomes small and smaller as n becomes larger.
+
+(Wanted to mention that the y axis of the graphs says $T(\lambda)$ but it should say $T(\hat{\lambda)}$. For some reason the hat doesn't appear but you can see in the source code that in theory the hat should appear, I just couldn't figure out how to make it work)
+```{r, tidy=TRUE}
+lr <- function(lmbd){2 * (num / lmbd + num * log(lmbd) - num)}
+score <- function(lmbd){num * (1 - 1 / lmbd)^2}
+wald <- function(lmbd){num * (1 - 1 / lmbd)^2}
+for (num in c(10, 25, 100)) {
+title <- bquote("Likelihood based statistics for Exp(" ~ lambda ~ "), " ~ "n ="~ .(num))
+curve(lr, 0.4, 2.1, main = title, type = 'l', lty = 1, col = 'grey', las=1,
+      xlab = bquote(widehat(lambda)), ylab = expression(paste("T(", widehat(lambda), ")")), 
+      xlim=c(0.5,2), ylim=c(0,50),)
+curve(score, 0.4, 2.1, type = 'l', lty = 1, col = 'red', add=TRUE)
+curve(wald, 0.4, 2.1, type = 'l', lty = 2, col = 'blue', add=TRUE)
+abline(h = qchisq(0.95, 1), lty = 2)
+legend('topright', legend = c("LR", 'Score', 'Wald', expression(paste(chi[1]^2, "(0.95)"))),
+       col = c('grey', 'red', 'blue', 'black'), lty=c(1,1,2,2), bty='n')
+}
+```

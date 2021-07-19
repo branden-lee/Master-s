@@ -1,0 +1,95 @@
+---
+title: "Assignment 3"
+author: "Branden Lee"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+header-includes: \usepackage{amsmath}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(latex2exp)
+library(ggplot2)
+library(GLMsData)
+library(gridExtra)
+```
+
+### Question 1
+
+```{r}
+
+data(danishlc)
+danishlc$Age = C(factor(danishlc$Age, 
+                        levels=c("40-54", "55-59", "60-64", "65-69", "70-74", ">74"), 
+                        ordered=T ), treatment)
+
+model1 <- glm(Cases ~ Age + City + offset(log(Pop)), family=poisson, data=danishlc)
+```
+
+#### a)
+```{r}
+countEstimate <- (exp(c(1,1,0,0,0,0,0,1,0) %*% model1$coef)) *
+  danishlc[danishlc$City=="Kolding" & danishlc$Age=='55-59','Pop']
+```
+The model-based estimate of the expected number of newly diagnosed lung cancer patients over this three year period in Kolding for the 55-59 old age group is `r countEstimate`.
+
+#### b)
+```{r}
+rrEstimate <- exp(summary(model1)$coef[5,1])
+se <- summary(model1)$coef[5,2]
+ciEstimate <- rrEstimate * exp(qnorm(p=.975) * se * c(-1,1))
+```
+The estimate of the relative increase in the lung cancer rate for those 70-74 years old compared to those 40-54 years old is `r rrEstimate`, and a 95% confidence interval for this estimate is (`r ciEstimate[1]`, `r ciEstimate[2]`).
+
+#### c)
+```{r}
+model2 <- glm(Cases ~ Age * City + offset(log(Pop)), family=poisson, data=danishlc)
+pVal <- pchisq(model1$deviance-model2$deviance, 
+               model1$df.residual - model2$df.residual, 
+               lower.tail=FALSE)
+```
+The saturated model is equivalent to the model with all interactions between the age factor variable and city factor variable: the $p$ value for testing the independence of age and city is `r pVal`>.05, so we do not reject the null hypothesis at the 95% level i.e. the data suggests there is no interaction between the factor variable for age and factor and that of city.
+
+#### d)
+```{r}
+fourYearRate <- exp(model1$coef %*% c(1,1,0,0,0,0,0,1,0)) #over 4 the year period
+estimate <- fourYearRate / 4 * 100000
+```
+Assuming the disease rate is stable over time, we can obtain the estimated rate for the year of 1970 by dividing the estimated rate over the four year period by 4. The estimated expected number of newly diagnosed lung cancer patients per 100000 person-years of risk in Kolding for the 55-59 year old age group for 1970 is `r estimate`.
+
+#### e)
+```{r echo=FALSE}
+danishlc$resp <- cbind(danishlc$Cases, danishlc$Pop - danishlc$Cases)
+model2 <- glm(resp ~ Age + City, family=binomial, data=danishlc)
+summary(model2)
+summary(model1)
+```
+The binomial model results in a very similar fit in terms of estimates of the coefficients (difference of at most .02 for each variable) as well as their statistical significance (highly similar $p$-values).
+
+#### f)
+The plot below shows lung cancer rates in each city split per age group. The incidence rates are all below 2.5% percent, which suggests that the probability of getting cancer is quite low. Consider the population of 70-74 year olds in Fredericia: this city has the highest lung cancer rate among all cities and all age groups in addition to having the smallest population (509). Indeed, from the summary of the fitted binomial model it is easy to see that this population has the largest estimated log odds i.e. the largest estimated cancer rate. Comparing the distribution of this subpopulation using the estimated probability with its poisson approximation,  we can see that the approximation is very good even in the smallest population with the largest estimated cancer rate. Since all other subpopulations have either lower estimated rates or larger populations (or both), the conditions of the poisson approximation seem to be satisfied.
+````{r}
+plot1 <- ggplot(danishlc, aes(x=Age, y=(resp[1] / Pop), color=City, shape=City)) + 
+  geom_point(size=2.5, stroke=1, fill=NA) + scale_shape(solid=FALSE) + 
+  ylab('Lung Cancer Rate')
+
+prob <- exp(c(1,0,0,0,1,0,0,0,0)%*%model2$coef)/
+  (1+exp(c(1,0,0,0,1,0,0,0,0)%*%model2$coef))
+
+binomDist <- data.frame(case=seq(0,25),
+                           density=dbinom(seq(0,25), size=509, p=prob),
+                           dist=rep('b',26))
+poisDist <- data.frame(case=seq(0,25),
+                          density=dpois(seq(0,25), lambda=509*prob),
+                          dist=rep('d',26))
+
+df <- rbind(binomDist,poisDist)
+plot2 <- ggplot(df, aes(x=case, y=density, fill=dist), xlab='x', ylab='pmf(x)') + 
+  geom_col(position = "dodge") + ylab('pmf(x)') + xlab('x') +
+  scale_fill_discrete(labels = unname(
+    TeX(c('Binomial(509, $\\hat{p}$)','Poisson(509$\\hat{p}$)'))))
+
+grid.arrange(plot1, plot2, nrow=2)
+```
